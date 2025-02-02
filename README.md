@@ -88,5 +88,5 @@ Advanced Error Handling: Enhance user experience by adding better error handling
 Customizable Models: Allow users to select between various models for answering questions. ⚙️
 
 Build by:
-JOHN EVANS OKYERE]
-DATA SCIENTIST / ML ENGINEER
+JOHN EVANS OKYERE
+DATA SCIENTIST / ML. ENGINEER
