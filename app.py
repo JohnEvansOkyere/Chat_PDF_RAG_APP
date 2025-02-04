@@ -3,8 +3,8 @@ import time
 from dotenv import load_dotenv
 
 import streamlit as st
-from langchain_community.llms import Ollama
-from langchain_community.embeddings import OllamaEmbeddings
+from langchain_ollama.llms import OllamaLLM
+from langchain_ollama import OllamaEmbeddings
 from langchain_community.vectorstores import InMemoryVectorStore
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter
@@ -14,9 +14,9 @@ load_dotenv()
 
 
 template = """
-    You are an assistant for questioning-answering tasks. Use the following pieces of retrieved context to answer the question.
-    If you don't know the answer just say that you don't know.
-    User three sentences maximum and keep the answer concise
+You are an assistant for question-answering tasks. Use only the provided context to answer the question. 
+If the context does not contain enough information to answer the question, say "I don't know." Do not make up answers or use external knowledge. 
+Keep your response concise and limit it to a maximum of three sentences.
 
     Question : {question}
     Context : {context}
@@ -27,10 +27,9 @@ pdf_directory = './pdf/'
 
 ollama_API_key = os.getenv("OLLAMA_API_KEY")
 
-MODEL = "llama2"
 
-model = Ollama(model=MODEL) 
-embeddings = OllamaEmbeddings()  # Embedding is converting text to vectors
+model = OllamaLLM(model=ollama_API_key) 
+embeddings = OllamaEmbeddings(model = ollama_API_key)  # Embedding is converting text to vectors
 vector_store = InMemoryVectorStore(embeddings)
 
 
@@ -61,11 +60,11 @@ def split_text(documents):
 
 # Index the documents
 def index_docs(documents):
-    vector_store.aadd_documents(documents)
+    vector_store.add_documents(documents)
 
 # Retrieving data from the vector store(It's like writing a query)
 def retrive_doc(query):
-    return vector_store.similarity_search(query)
+    return vector_store.similarity_search(query, K=5)
 
 
 # Answer the questions asked
@@ -100,3 +99,6 @@ if uploaded_file:
         related_documents = retrive_doc(question)
         answer = answer_question(question, related_documents)
         st.chat_message("assistant").write(answer)
+
+
+        
