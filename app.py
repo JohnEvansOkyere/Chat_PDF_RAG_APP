@@ -5,18 +5,19 @@ from dotenv import load_dotenv
 import streamlit as st
 from langchain_ollama.llms import OllamaLLM
 from langchain_ollama import OllamaEmbeddings
-from langchain_community.vectorstores import InMemoryVectorStore
+from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_community.document_loaders import PDFPlumberLoader
 from langchain_text_splitters.character import RecursiveCharacterTextSplitter
 from langchain_core.prompts import ChatPromptTemplate
 
-load_dotenv()
+#load_dotenv()
 
 
 template = """
 You are an assistant for question-answering tasks. Use only the provided context to answer the question. 
 If the context does not contain enough information to answer the question, say "I don't know." Do not make up answers or use external knowledge. 
 Keep your response concise and limit it to a maximum of three sentences.
+Don't include your thinking method, just the right answer.
 
     Question : {question}
     Context : {context}
@@ -25,11 +26,11 @@ Keep your response concise and limit it to a maximum of three sentences.
 
 pdf_directory = './pdf/'
 
-ollama_API_key = os.getenv("OLLAMA_API_KEY")
+# ollama_API_key = os.getenv("OLLAMA_API_KEY")
 
 
-model = OllamaLLM(model=ollama_API_key) 
-embeddings = OllamaEmbeddings(model = ollama_API_key)  # Embedding is converting text to vectors
+model = OllamaLLM(model= "deepseek-r1:14b") 
+embeddings = OllamaEmbeddings(model = "deepseek-r1:14b")  # Embedding is converting text to vectors
 vector_store = InMemoryVectorStore(embeddings)
 
 
