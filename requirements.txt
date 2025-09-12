@@ -2,7 +2,7 @@
 # Developed by: John Evans Okyere
 
 # Core Streamlit Framework
-streamlit>
+streamlit
 
 # LangChain and Components
 langchain
