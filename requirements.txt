@@ -1,7 +1,48 @@
-streamlit
+# VexaAI RAG Chat PDF Application Dependencies
+# Developed by: John Evans Okyere
+
+# Core Streamlit Framework
+streamlit>
+
+# LangChain and Components
+langchain
 langchain-community
 langchain-core
+langchain-ollama
 langchain-text-splitters
-python-dotenv
+
+# PDF Processing
 pdfplumber
-ollama
+pypdf
+pymupdf
+
+# Vector Store and Embeddings
+faiss-cpu
+chromadb
+numpy
+
+# HTTP and API
+requests
+httpx
+
+# Environment and Configuration
+python-dotenv
+
+# Data Processing
+pandas
+python-json-logger
+
+# System and Performance Monitoring
+psutil
+
+# Additional Utilities
+typing-extensions
+pydantic
+tenacity
+
+# Development and Testing (Optional)
+pytest
+black
+flake8
+mypy
+
