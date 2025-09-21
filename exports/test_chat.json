@@ -1,0 +1,10 @@
+{
+  "export_timestamp": "2025-09-21T23:23:05.463918",
+  "total_messages": 1,
+  "messages": [
+    {
+      "role": "user",
+      "content": "Hello"
+    }
+  ]
+}
