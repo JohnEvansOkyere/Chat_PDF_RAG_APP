@@ -196,3 +196,15 @@ class CloudPDFProcessor:
         
         return preview_text.strip()
 
+
+
+
+
+
+
+
+
+
+
+
+

@@ -10,11 +10,13 @@ langchain-community
 langchain-core
 langchain-ollama
 langchain-text-splitters
+tiktoken
 
 # PDF Processing
 pdfplumber
 pypdf
 pymupdf
+PyMuPDF
 
 # Vector Store and Embeddings
 faiss-cpu
@@ -24,31 +26,51 @@ numpy
 # HTTP and API
 requests
 httpx
+aiofiles
 
 # Environment and Configuration
 python-dotenv
+pydantic
+pydantic-settings
+pydantic[email]
 
 # Data Processing
 pandas
 python-json-logger
+structlog
 
 # System and Performance Monitoring
 psutil
 
 # Additional Utilities
 typing-extensions
-pydantic
 tenacity
+
+# Authentication and Security
+PyJWT
+bcrypt
+cryptography
+python-jose[cryptography]
+
+# Database
+supabase
+psycopg2-binary
+asyncpg
+
+# LLM Integrations
+openai
+anthropic
+cohere
+
+# FastAPI and Server
+fastapi
+uvicorn[standard]
+python-multipart
 
 # Development and Testing (Optional)
 pytest
+pytest-asyncio
 black
 flake8
 mypy
-fastapi
-
-# Add this line to your requirements.txt
-pydantic-settings
-
-# Make sure you also have:
-pydantic[email]
+isort
