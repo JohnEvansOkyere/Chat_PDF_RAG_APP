@@ -9,7 +9,7 @@ from datetime import datetime
 
 from app.config import settings
 from app.database import get_supabase_client
-from app.services.cloud_vector_service import CloudVectorService
+from app.services.vector_service import VectorService
 
 if settings.llm_provider == "openai":
     import openai
@@ -20,13 +20,13 @@ elif settings.llm_provider == "cohere":
 
 logger = logging.getLogger(__name__)
 
-class CloudChatEngine:
+class ChatService:
     """Cloud replacement for your original ChatEngine"""
     
     def __init__(self):
         self.config = settings
         self.supabase = get_supabase_client()
-        self.vector_service = CloudVectorService()
+        self.vector_service = VectorService()
         self.logger = logger
         self._initialize_llm_client()
     
@@ -226,49 +226,5 @@ Context: {context}"""
         ]
         return suggestions[:3]
 
-# backend/app/__init__.py
-"""
-VexaAI RAG Chat PDF Backend Application
-"""
 
-__version__ = "1.0.0"
-__author__ = "John Evans Okyere"
 
-# backend/app/services/__init__.py
-"""
-Services package for VexaAI RAG Chat PDF Backend
-"""
-
-from .auth_service import AuthService
-from .document_service import DocumentService  
-from .chat_service import ChatService
-from .vector_service import VectorService
-from .llm_service import LLMService
-
-__all__ = [
-    'AuthService',
-    'DocumentService', 
-    'ChatService',
-    'VectorService',
-    'LLMService'
-]
-
-# backend/app/middleware/__init__.py
-"""
-Middleware package
-"""
-
-from .rate_limiter import RateLimitMiddleware
-from .logging_middleware import LoggingMiddleware
-
-__all__ = ['RateLimitMiddleware', 'LoggingMiddleware']
-
-# backend/app/utils/__init__.py
-"""
-Utilities package
-"""
-
-from .pdf_processor import CloudPDFProcessor
-from .exceptions import setup_exception_handlers
-
-__all__ = ['CloudPDFProcessor', 'setup_exception_handlers']
