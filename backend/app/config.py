@@ -2,11 +2,11 @@
 """
 Fixed configuration with correct Pydantic imports
 """
-
 import os
-from typing import List
+from typing import List, Union
 from pydantic_settings import BaseSettings
 from pydantic import validator
+import json
 
 class Settings(BaseSettings):
     """Application settings with Grok and Claude support"""
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     grok_api_key: str = ""
     grok_model: str = "grok-beta"
     
-    # Claude (Anthropic) Configuration  
+    # Claude (Anthropic) Configuration
     claude_api_key: str = ""
     claude_model: str = "claude-3-sonnet-20240229"
     
@@ -68,20 +68,46 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     rate_limit_per_hour: int = 1000
     
-    # CORS
-    cors_origins: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://localhost:3000"
-    ]
+    # CORS - Changed to Union type to handle both string and list
+    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:3001,https://localhost:3000"
     
     @validator('cors_origins', pre=True)
-    def assemble_cors_origins(cls, v):
-        if isinstance(v, str) and not v.startswith('['):
-            return [i.strip() for i in v.split(',')]
-        elif isinstance(v, (list, str)):
+    def parse_cors_origins(cls, v):
+        """Parse CORS origins from various formats"""
+        if isinstance(v, str):
+            # Handle JSON-like format from .env
+            if v.startswith('[') and v.endswith(']'):
+                try:
+                    # Try to parse as JSON first
+                    return json.loads(v)
+                except json.JSONDecodeError:
+                    # If JSON parsing fails, manually parse
+                    origins_str = v.strip('[]').strip()
+                    if not origins_str:
+                        return ["http://localhost:3000"]
+                    # Split by comma and clean up
+                    origins = []
+                    for origin in origins_str.split(','):
+                        origin = origin.strip().strip('"\'')
+                        if origin:
+                            origins.append(origin)
+                    return origins if origins else ["http://localhost:3000"]
+            
+            # Handle comma-separated format
+            elif ',' in v:
+                origins = [origin.strip() for origin in v.split(',') if origin.strip()]
+                return origins if origins else ["http://localhost:3000"]
+            
+            # Handle single URL
+            else:
+                return [v.strip()] if v.strip() else ["http://localhost:3000"]
+        
+        # If it's already a list, return as is
+        elif isinstance(v, list):
             return v
-        raise ValueError(v)
+        
+        # Fallback
+        return ["http://localhost:3000"]
     
     @property
     def max_file_size_bytes(self) -> int:
@@ -98,7 +124,7 @@ class Settings(BaseSettings):
             }
         elif self.llm_provider == "claude":
             return {
-                "provider": "claude", 
+                "provider": "claude",
                 "api_key": self.claude_api_key,
                 "model": self.claude_model
             }
@@ -111,7 +137,7 @@ class Settings(BaseSettings):
         else:
             raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
     
-    @property 
+    @property
     def current_embedding_config(self) -> dict:
         """Get current embedding configuration"""
         if self.embedding_provider == "openai":
@@ -123,7 +149,7 @@ class Settings(BaseSettings):
         elif self.embedding_provider == "cohere":
             return {
                 "provider": "cohere",
-                "api_key": self.cohere_api_key, 
+                "api_key": self.cohere_api_key,
                 "model": self.cohere_embedding_model
             }
         else:
