@@ -1,0 +1,181 @@
+# Supabase Environment Configuration
+
+## Setup Instructions
+
+### 1. Create Supabase Project
+1. Go to [supabase.com](https://supabase.com) and create a new project
+2. Wait for the project to be fully provisioned (2-3 minutes)
+3. Go to Settings > API to get your project credentials
+
+### 2. Enable Required Extensions
+Run this in the Supabase SQL Editor:
+```sql
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+
+### 3. Run Database Schema
+Copy and paste the complete SQL schema from the first artifact into the Supabase SQL Editor and execute it.
+
+### 4. Create Storage Bucket
+In the Supabase Dashboard:
+1. Go to Storage
+2. Create a new bucket called "documents"
+3. Make it private (not public)
+4. The RLS policies in the schema will handle access control
+
+### 5. Environment Variables
+
+Create a `.env.local` file in your project root:
+
+```env
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-id.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# LLM Configuration (choose one)
+# OpenAI
+OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_MODEL=gpt-4-turbo-preview
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+# Anthropic Claude
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+ANTHROPIC_MODEL=claude-3-sonnet-20240229
+
+# Cohere
+COHERE_API_KEY=your-cohere-api-key
+COHERE_MODEL=command-r-plus
+COHERE_EMBEDDING_MODEL=embed-english-v3.0
+
+# Application Configuration
+JWT_SECRET=your-super-secret-jwt-token-with-at-least-32-characters
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-nextauth-secret
+
+# File Upload Configuration
+MAX_FILE_SIZE_MB=50
+ALLOWED_EXTENSIONS=pdf
+
+# Processing Configuration
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+SIMILARITY_SEARCH_K=5
+RELEVANCE_THRESHOLD=0.7
+```
+
+## Backend Environment (.env)
+
+For the FastAPI backend, create a `.env` file:
+
+```env
+# Database
+DATABASE_URL=postgresql://postgres:your-db-password@db.your-project-id.supabase.co:5432/postgres
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# LLM Configuration
+OPENAI_API_KEY=sk-your-openai-api-key
+OPENAI_MODEL=gpt-4-turbo-preview
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+
+# Application
+JWT_SECRET=your-super-secret-jwt-token-with-at-least-32-characters
+ENVIRONMENT=development
+DEBUG=true
+LOG_LEVEL=INFO
+
+# Processing
+MAX_FILE_SIZE_MB=50
+CHUNK_SIZE=1000
+CHUNK_OVERLAP=200
+SIMILARITY_SEARCH_K=5
+RELEVANCE_THRESHOLD=0.7
+
+# CORS
+CORS_ORIGINS=http://localhost:3000,https://your-frontend-domain.vercel.app
+
+# Rate Limiting
+RATE_LIMIT_PER_MINUTE=60
+RATE_LIMIT_PER_HOUR=1000
+```
+
+## Supabase Configuration Verification
+
+### Test Database Connection
+Create a simple test file `test-supabase.js`:
+
+```javascript
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
+
+async function testConnection() {
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('count')
+      .limit(1)
+    
+    if (error) {
+      console.error('Connection failed:', error)
+    } else {
+      console.log('Connection successful!')
+    }
+  } catch (err) {
+    console.error('Error:', err)
+  }
+}
+
+testConnection()
+```
+
+### Test Vector Search Function
+```javascript
+import { supabase } from './lib/supabase/client'
+
+async function testVectorSearch() {
+  // Test with dummy embedding (replace with real embedding)
+  const dummyEmbedding = new Array(1536).fill(0.1)
+  
+  const { data, error } = await supabase
+    .rpc('search_document_chunks', {
+      query_embedding: dummyEmbedding,
+      similarity_threshold: 0.5,
+      match_count: 5
+    })
+  
+  if (error) {
+    console.error('Vector search test failed:', error)
+  } else {
+    console.log('Vector search working:', data)
+  }
+}
+```
+
+## Next Steps
+
+After setting up Supabase:
+
+1. **Backend API Development** - Create FastAPI application with database integration
+2. **Authentication Setup** - Implement user authentication flow
+3. **File Upload Handler** - PDF upload to Supabase Storage
+4. **Vector Processing** - Document chunking and embedding generation
+5. **Frontend Development** - Next.js application with chat interface
+
+The database foundation is now ready to support your cloud RAG application!
+
+## Security Considerations
+
+- Never commit `.env` files to version control
+- Use different keys for development and production
+- Enable Row Level Security (RLS) policies (already included in schema)
+- Regularly rotate API keys and secrets
+- Monitor API usage to prevent abuse
+- Set up proper CORS policies for production
