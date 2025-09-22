@@ -10,7 +10,7 @@ from datetime import datetime
 from app.config import settings
 from app.database import get_supabase_client
 from app.services.vector_service import VectorService
-
+    
 if settings.llm_provider == "openai":
     import openai
 elif settings.llm_provider == "anthropic":
