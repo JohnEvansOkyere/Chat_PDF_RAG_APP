@@ -16,16 +16,12 @@ from supabase import create_client
 
 from app.config import settings
 from app.database import get_supabase_client
-from app.services.vector_service import VectorService
-from app.utils.pdf_processor import PDFProcessor
 
 logger = logging.getLogger(__name__)
 
 class DocumentService:
     def __init__(self):
         self.supabase = get_supabase_client()
-        self.vector_service = VectorService()
-        self.pdf_processor = PDFProcessor()
     
     async def create_document(self, user_id: str, file: UploadFile) -> Dict[str, Any]:
         """Create document record and upload to storage"""
@@ -41,16 +37,18 @@ class DocumentService:
             file_size = len(file_content)
             
             # Upload to Supabase storage
-            storage_response = self.supabase.storage.from_('documents').upload(
-                storage_path,
-                file_content,
-                file_options={
-                    'content-type': file.content_type or 'application/pdf'
-                }
-            )
-            
-            if storage_response.get('error'):
-                raise Exception(f"Storage upload failed: {storage_response['error']}")
+            try:
+                storage_response = self.supabase.storage.from_('documents').upload(
+                    storage_path,
+                    file_content,
+                    file_options={
+                        'content-type': file.content_type or 'application/pdf'
+                    }
+                )
+                logger.info(f"Storage upload completed for {storage_path}")
+            except Exception as storage_error:
+                logger.error(f"Storage upload failed: {storage_error}")
+                raise Exception(f"Storage upload failed: {storage_error}")
             
             # Create document record
             document_data = {
@@ -61,7 +59,7 @@ class DocumentService:
                 'file_path': storage_path,
                 'file_size': file_size,
                 'mime_type': file.content_type or 'application/pdf',
-                'status': 'processing'
+                'status': 'completed'  # Set to completed for now, no processing
             }
             
             response = self.supabase.table('documents').insert(document_data).execute()
@@ -76,74 +74,30 @@ class DocumentService:
             raise
     
     async def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
-        """Process uploaded document: extract text, chunk, and create embeddings"""
-        start_time = datetime.utcnow()
-        
+        """Process uploaded document - placeholder implementation"""
         try:
-            # Get document record
-            doc_response = self.supabase.table('documents').select('*').eq('id', document_id).single().execute()
+            logger.info(f"Processing document {document_id} for user {user_id}")
             
-            if not doc_response.data:
-                raise Exception("Document not found")
+            # Update document status to completed
+            update_data = {
+                'status': 'completed',
+                'processed_at': datetime.utcnow().isoformat()
+            }
             
-            document = doc_response.data
+            response = self.supabase.table('documents').update(update_data).eq('id', document_id).execute()
             
-            # Download file from storage
-            file_response = self.supabase.storage.from_('documents').download(document['file_path'])
-            
-            if not file_response:
-                raise Exception("Failed to download file from storage")
-            
-            # Save to temporary file for processing
-            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp_file:
-                tmp_file.write(file_response)
-                tmp_file_path = tmp_file.name
-            
-            try:
-                # Process PDF
-                processing_result = await self.pdf_processor.process_pdf(tmp_file_path)
+            if response.data:
+                return response.data[0]
+            else:
+                raise Exception("Failed to update document status")
                 
-                # Create embeddings and store chunks
-                await self.vector_service.create_document_embeddings(
-                    document_id=document_id,
-                    chunks=processing_result['chunks']
-                )
-                
-                # Calculate processing time
-                processing_time = (datetime.utcnow() - start_time).total_seconds()
-                
-                # Update document with processing results
-                update_data = {
-                    'status': 'completed',
-                    'processing_time': processing_time,
-                    'page_count': processing_result['stats']['total_pages'],
-                    'total_chunks': processing_result['stats']['total_chunks'],
-                    'total_characters': processing_result['stats']['total_characters'],
-                    'total_words': processing_result['stats']['total_words'],
-                    'preview_text': processing_result['preview'],
-                    'processed_at': datetime.utcnow().isoformat()
-                }
-                
-                update_response = self.supabase.table('documents').update(update_data).eq('id', document_id).execute()
-                
-                if update_response.data:
-                    return update_response.data[0]
-                else:
-                    raise Exception("Failed to update document status")
-                    
-            finally:
-                # Clean up temporary file
-                if os.path.exists(tmp_file_path):
-                    os.unlink(tmp_file_path)
-                    
         except Exception as e:
             logger.error(f"Error processing document {document_id}: {e}")
             
             # Update document status to failed
             error_update = {
                 'status': 'failed',
-                'error_message': str(e),
-                'processing_time': (datetime.utcnow() - start_time).total_seconds()
+                'error_message': str(e)
             }
             
             self.supabase.table('documents').update(error_update).eq('id', document_id).execute()
@@ -166,15 +120,25 @@ class DocumentService:
     
     async def delete_document(self, document_id: str, user_id: str):
         """Delete document and associated data"""
-        # Verify ownership
-        document = await self.get_document(document_id, user_id)
-        
-        # Delete from storage
-        storage_response = self.supabase.storage.from_('documents').remove([document['file_path']])
-        
-        # Delete chunks
-        self.supabase.table('document_chunks').delete().eq('document_id', document_id).execute()
-        
-        # Mark document as deleted
-        self.supabase.table('documents').update({'status': 'deleted'}).eq('id', document_id).execute()
-
+        try:
+            # Get document first
+            document = await self.get_document(document_id, user_id)
+            
+            # Try to delete from storage
+            try:
+                self.supabase.storage.from_('documents').remove([document['file_path']])
+            except Exception as e:
+                logger.warning(f"Failed to delete file from storage: {e}")
+            
+            # Delete chunks if they exist
+            try:
+                self.supabase.table('document_chunks').delete().eq('document_id', document_id).execute()
+            except Exception as e:
+                logger.warning(f"Failed to delete chunks: {e}")
+            
+            # Mark document as deleted
+            self.supabase.table('documents').update({'status': 'deleted'}).eq('id', document_id).execute()
+            
+        except Exception as e:
+            logger.error(f"Error deleting document {document_id}: {e}")
+            raise

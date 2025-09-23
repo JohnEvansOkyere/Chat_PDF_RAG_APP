@@ -98,6 +98,41 @@ class AuthService:
             logger.error(f"Login failed: {e}")
             raise
     
+
+    
+    # Add this method to your AuthService class
+
+    async def verify_token(self, token: str) -> Dict[str, Any]:
+        """Verify JWT token and return user data"""
+        try:
+            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
+            user_id = payload.get('user_id')
+            
+            if not user_id:
+                raise Exception("Invalid token")
+            
+            # Get user from database
+            user_response = self.supabase.table('user_profiles').select('*').eq('id', user_id).execute()
+            
+            if not user_response.data:
+                raise Exception("User not found")
+            
+            user = user_response.data[0]
+            return {
+                "id": user['id'],
+                "email": user['email'],
+                "display_name": user['display_name']
+            }
+            
+        except jwt.ExpiredSignatureError:
+            raise Exception("Token has expired")
+        except jwt.InvalidTokenError:
+            raise Exception("Invalid token")
+        except Exception as e:
+            logger.error(f"Token verification failed: {e}")
+            raise
+
+
     async def logout_user(self, user_id: str):
         """Logout user (placeholder - JWT is stateless)"""
         # In a real app, you might blacklist the token
