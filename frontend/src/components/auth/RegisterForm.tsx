@@ -14,19 +14,34 @@ export default function RegisterForm() {
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  e.preventDefault();
+  setIsLoading(true);
 
-    try {
-      await authAPI.register(email, password, displayName);
-      toast.success('Registration successful! Please sign in.');
-      router.push('/auth/login');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
-    } finally {
-      setIsLoading(false);
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        password,
+        display_name: displayName, // ✅ match backend Pydantic model
+      }),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.detail || 'Registration failed');
     }
-  };
+
+    toast.success('Registration successful! Please sign in.');
+    router.push('/auth/login');
+  } catch (error: any) {
+    toast.error(error.message);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
