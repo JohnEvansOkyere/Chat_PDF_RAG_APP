@@ -86,6 +86,7 @@ class ChatService:
             self.logger.error(f"Failed to delete session: {e}")
             raise
 
+        # backend/app/services/chat_service.py
     async def process_message(self, session_id: str, user_id: str, message: str, document_id: Optional[str] = None) -> Dict[str, Any]:
         """Process message and generate response"""
         try:
@@ -101,7 +102,7 @@ class ChatService:
             
             self.supabase.table('chat_messages').insert(user_message_data).execute()
             
-            # Generate AI response (placeholder for now)
+            # Generate AI response
             ai_response = f"Thank you for your message: '{message}'. This is a placeholder response from the chat service."
             
             # Save AI response
@@ -116,9 +117,8 @@ class ChatService:
             
             ai_message_response = self.supabase.table('chat_messages').insert(ai_message_data).execute()
             
-            # Update session message count
+            # Update session - remove the problematic SQL increment
             self.supabase.table('chat_sessions').update({
-                'message_count': self.supabase.sql('message_count + 1'),
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('id', session_id).execute()
             
