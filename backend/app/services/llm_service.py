@@ -31,7 +31,7 @@ class LLMService:
                 "Authorization": f"Bearer {self.config.grok_api_key}",
                 "Content-Type": "application/json"
             }
-            self.model = self.config.grok_model or "grok-4-fast-reasoning"
+            self.model = self.config.grok_model or "grok-beta"
 
         elif provider == "claude":
             self.api_url = "https://api.anthropic.com/v1/messages"
@@ -67,12 +67,13 @@ You have been developed by John Evans Okyere to provide accurate, concise, and h
 Instructions:
 1. Use ONLY the provided context to answer questions
 2. If the context doesn't contain sufficient information, clearly state "I don't have enough information in the provided document to answer this question."
-3. Keep responses concise and limit to a maximum of three sentences unless more detail is specifically requested
-4. Do not make up information or use external knowledge
+3. Keep responses concise and limit to a maximum of 200 words unless more detail is specifically requested
+4. Do not make up information or use external knowledge beyond the provided context
 5. Be professional and helpful in your responses
 6. If asked about topics outside the document, politely redirect to document-related questions
+7. Cite relevant parts of the document when answering
 
-Context: {context}"""
+Context from document: {context}"""
 
             provider = self.config.llm_provider.lower()
             if provider == "grok":
@@ -94,16 +95,17 @@ Context: {context}"""
             messages = [{"role": "system", "content": system_prompt}]
             
             if history:
-                messages.extend(history[-10:])  # Keep last 10 exchanges
+                messages.extend(history[-8:])  # Keep last 8 exchanges
             
             messages.append({"role": "user", "content": user_message})
             
             payload = {
                 "model": self.model,
                 "messages": messages,
-                "temperature": 0.1,
-                "max_tokens": 500,
-                "stream": False
+                "temperature": 0.3,
+                "max_tokens": 1000,
+                "stream": False,
+                "top_p": 0.9
             }
             
             response = await self.client.post(
@@ -121,10 +123,93 @@ Context: {context}"""
                     'provider': 'grok'
                 }
             else:
-                raise Exception(f"Grok API error: {response.status_code} - {response.text}")
+                self.logger.error(f"Grok API error: {response.status_code} - {response.text}")
+                raise Exception(f"Grok API error: {response.status_code}")
                 
         except Exception as e:
             self.logger.error(f"Error with Grok API: {e}")
+            raise
+    
+    async def _generate_claude_response(self, system_prompt: str, user_message: str, history: List[Dict] = None) -> Dict[str, Any]:
+        """Generate response using Claude API"""
+        try:
+            messages = []
+            
+            if history:
+                messages.extend(history[-8:])  # Keep last 8 exchanges
+            
+            messages.append({"role": "user", "content": user_message})
+            
+            payload = {
+                "model": self.model,
+                "max_tokens": 1000,
+                "temperature": 0.3,
+                "system": system_prompt,
+                "messages": messages
+            }
+            
+            response = await self.client.post(
+                self.api_url,
+                headers=self.headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'response': data['content'][0]['text'],
+                    'tokens_used': data.get('usage', {}).get('input_tokens', 0) + data.get('usage', {}).get('output_tokens', 0),
+                    'model': self.model,
+                    'provider': 'claude'
+                }
+            else:
+                self.logger.error(f"Claude API error: {response.status_code} - {response.text}")
+                raise Exception(f"Claude API error: {response.status_code}")
+                
+        except Exception as e:
+            self.logger.error(f"Error with Claude API: {e}")
+            raise
+    
+    async def _generate_openai_response(self, system_prompt: str, user_message: str, history: List[Dict] = None) -> Dict[str, Any]:
+        """Generate response using OpenAI API"""
+        try:
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            if history:
+                messages.extend(history[-8:])  # Keep last 8 exchanges
+            
+            messages.append({"role": "user", "content": user_message})
+            
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": 0.3,
+                "max_tokens": 1000,
+                "top_p": 0.9,
+                "frequency_penalty": 0,
+                "presence_penalty": 0
+            }
+            
+            response = await self.client.post(
+                self.api_url,
+                headers=self.headers,
+                json=payload
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'response': data['choices'][0]['message']['content'],
+                    'tokens_used': data.get('usage', {}).get('total_tokens', 0),
+                    'model': self.model,
+                    'provider': 'openai'
+                }
+            else:
+                self.logger.error(f"OpenAI API error: {response.status_code} - {response.text}")
+                raise Exception(f"OpenAI API error: {response.status_code}")
+                
+        except Exception as e:
+            self.logger.error(f"Error with OpenAI API: {e}")
             raise
 
     async def test_connection(self) -> str:
@@ -135,6 +220,26 @@ Context: {context}"""
         except Exception as e:
             self.logger.error(f"LLM connection test failed: {e}")
             raise
+    
+    async def generate_streaming_response(
+        self,
+        user_message: str,
+        context: str = "",
+        conversation_history: List[Dict[str, str]] = None
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming response (currently simulated, can be enhanced later)"""
+        try:
+            # For now, generate regular response and stream it word by word
+            response = await self.generate_response(user_message, context, conversation_history)
+            
+            words = response['response'].split()
+            for word in words:
+                yield f"{word} "
+                await asyncio.sleep(0.05)  # Small delay for streaming effect
+                
+        except Exception as e:
+            self.logger.error(f"Streaming response failed: {e}")
+            yield f"Error: {str(e)}"
     
     async def __aenter__(self):
         return self

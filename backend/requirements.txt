@@ -78,3 +78,4 @@ isort
 
 PyJWT
 bcrypt
+PyPDF2
