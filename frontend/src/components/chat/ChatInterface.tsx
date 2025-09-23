@@ -49,18 +49,21 @@ export default function ChatInterface({ sessionId, documentId, messages, onNewMe
         document_id: documentId,
       };
 
-      const response = await chatAPI.sendMessage(sessionId, request);
-      
-      const assistantMessage: ChatMessage = {
-        id: response.id,
-        role: 'assistant',
-        content: response.message,
-        created_at: response.timestamp,
-        tokens_used: response.tokens_used,
-        processing_time: response.processing_time,
-      };
-      
-      onNewMessage(assistantMessage);
+  // frontend/src/components/chat/ChatInterface.tsx
+// Replace the response handling in handleSend function:
+
+  const response = await chatAPI.sendMessage(sessionId, request);
+
+  const assistantMessage: ChatMessage = {
+    id: response.message_id,        // Changed from response.id
+    role: 'assistant',
+    content: response.content,      // Changed from response.message
+    created_at: response.created_at, // Changed from response.timestamp
+    tokens_used: response.tokens_used,
+    processing_time: response.processing_time,
+  };
+
+  onNewMessage(assistantMessage);
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to send message');
       
