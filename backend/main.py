@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Backgroun
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
+
 import uvicorn
 from typing import List, Optional
 import asyncio
@@ -30,6 +31,13 @@ from app.services.llm_service import LLMService
 from app.middleware.rate_limiter import RateLimitMiddleware
 from app.middleware.logging_middleware import LoggingMiddleware
 from app.utils.exceptions import setup_exception_handlers
+from app.api import auth
+
+
+app = FastAPI(title="VexaAI RAG Chat PDF API")
+app.include_router(auth.router, prefix="/api/auth")
+
+
 
 # Configure logging
 logging.basicConfig(
