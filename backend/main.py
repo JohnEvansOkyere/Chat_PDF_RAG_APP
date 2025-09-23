@@ -1,4 +1,3 @@
-# backend/main.py
 """
 VexaAI RAG Chat PDF - FastAPI Backend
 Developed by: John Evans Okyere
@@ -11,39 +10,32 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Backgroun
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
-
 import uvicorn
 from typing import List, Optional
 import asyncio
 from datetime import datetime, timedelta
 
-from app.config import settings
-from app.database import get_supabase_client
-from app.models import (
-    ChatRequest, ChatResponse, DocumentUploadResponse, 
-    ChatSession, UserProfile, DocumentInfo
-)
-from app.services.auth_service import AuthService
-from app.services.document_service import DocumentService
-from app.services.chat_service import ChatService
-from app.services.vector_service import VectorService
-from app.services.llm_service import LLMService
-from app.middleware.rate_limiter import RateLimitMiddleware
-from app.middleware.logging_middleware import LoggingMiddleware
-from app.utils.exceptions import setup_exception_handlers
-from app.api import auth
-
-
-app = FastAPI(title="VexaAI RAG Chat PDF API")
-app.include_router(auth.router, prefix="/api/auth")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # your frontend
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+try:
+    from app.config import settings
+    from app.database import get_supabase_client
+    from app.models import (
+        ChatRequest, ChatResponse, DocumentUploadResponse, 
+        ChatSession, UserProfile, DocumentInfo,
+        UserRegistrationRequest, UserLoginRequest
+    )
+    from app.services.auth_service import AuthService
+    from app.services.document_service import DocumentService
+    from app.services.chat_service import ChatService
+    from app.services.vector_service import VectorService
+    from app.services.llm_service import LLMService
+    from app.middleware.rate_limiter import RateLimitMiddleware
+    from app.middleware.logging_middleware import LoggingMiddleware
+    from app.utils.exceptions import setup_exception_handlers
+except ImportError as e:
+    print(f"Import Error: {e}")
+    print("Please ensure all required modules are created in the app/ directory")
+    print("Check your project structure and .env file configuration")
+    exit(1)
 
 # Configure logging
 logging.basicConfig(
@@ -145,20 +137,20 @@ async def health_check():
 
 # Authentication endpoints
 @app.post("/api/auth/register")
-async def register(email: str, password: str, display_name: Optional[str] = None):
+async def register(request: UserRegistrationRequest):
     """Register a new user"""
     try:
-        user = await auth_service.register_user(email, password, display_name)
+        user = await auth_service.register_user(request.email, request.password, request.display_name)
         return {"user": user, "message": "Registration successful"}
     except Exception as e:
         logger.error(f"Registration failed: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.post("/api/auth/login")
-async def login(email: str, password: str):
+async def login(request: UserLoginRequest):
     """Login user"""
     try:
-        result = await auth_service.login_user(email, password)
+        result = await auth_service.login_user(request.email, request.password)
         return result
     except Exception as e:
         logger.error(f"Login failed: {e}")

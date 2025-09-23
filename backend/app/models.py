@@ -16,6 +16,18 @@ class BaseModelWithConfig(BaseModel):
             UUID: lambda v: str(v) if v else None
         }
 
+# Authentication models - Required by main.py
+class UserRegistrationRequest(BaseModel):
+    """User registration request"""
+    email: str = Field(..., pattern=r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    password: str = Field(..., min_length=6)
+    display_name: Optional[str] = None
+
+class UserLoginRequest(BaseModel):
+    """User login request"""
+    email: str
+    password: str
+
 # Chat models - Required by main.py
 class ChatRequest(BaseModel):
     """Chat message request"""

@@ -18,15 +18,16 @@ export default function RegisterForm() {
   setIsLoading(true);
 
   try {
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        password,
-        display_name: displayName, // ✅ match backend Pydantic model
-      }),
+    const res = await fetch('http://localhost:8000/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      password,
+      display_name: displayName,
+    }),
     });
+
 
     if (!res.ok) {
       const errorData = await res.json();

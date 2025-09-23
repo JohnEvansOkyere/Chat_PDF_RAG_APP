@@ -21,107 +21,80 @@ class AuthService:
         self.jwt_algorithm = settings.jwt_algorithm
     
     async def register_user(self, email: str, password: str, display_name: Optional[str] = None) -> Dict[str, Any]:
-        """Register new user"""
+        """Register new user using Supabase Auth"""
         try:
-            # Check if user already exists
+            # Check if user already exists in profiles
             existing_user = self.supabase.table('user_profiles').select('*').eq('email', email).execute()
             if existing_user.data:
                 raise Exception("User with this email already exists")
             
-            # Hash password
-            hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+            # Create user with Supabase Auth first
+            auth_response = self.supabase.auth.sign_up({
+                "email": email,
+                "password": password
+            })
             
-            # For now, create user directly in our database
-            # In production, you'd use Supabase Auth
-            user_data = {
-                'email': email,
-                'display_name': display_name or email.split('@')[0],
-                'subscription_tier': 'free',
-                'api_usage_count': 0
-            }
-            
-            # Insert into user_profiles
-            response = self.supabase.table('user_profiles').insert(user_data).execute()
-            
-            if response.data:
-                return {
-                    "id": response.data[0]['id'],
-                    "email": response.data[0]['email'],
-                    "display_name": response.data[0]['display_name']
+            if auth_response.user:
+                # Create profile with the auth user's ID
+                user_data = {
+                    'id': auth_response.user.id,  # Use the auth user's UUID
+                    'email': email,
+                    'display_name': display_name or email.split('@')[0],
+                    'avatar_url': None,
+                    'subscription_tier': 'free',
+                    'api_usage_count': 0
                 }
+                
+                # Insert into user_profiles
+                response = self.supabase.table('user_profiles').insert(user_data).execute()
+                
+                if response.data:
+                    return {
+                        "id": response.data[0]['id'],
+                        "email": response.data[0]['email'],
+                        "display_name": response.data[0]['display_name']
+                    }
+                else:
+                    raise Exception("Failed to create user profile")
             else:
-                raise Exception("Failed to create user")
+                raise Exception("Failed to create auth user")
                 
         except Exception as e:
             logger.error(f"Registration failed: {e}")
             raise
-    
+        
     async def login_user(self, email: str, password: str) -> Dict[str, Any]:
-        """Login user and return JWT token"""
+        """Login user using Supabase Auth"""
         try:
-            # Find user
-            user_response = self.supabase.table('user_profiles').select('*').eq('email', email).execute()
+            # Use Supabase Auth for login
+            auth_response = self.supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
             
-            if not user_response.data:
+            if auth_response.user and auth_response.session:
+                # Get user profile
+                user_response = self.supabase.table('user_profiles').select('*').eq('id', auth_response.user.id).execute()
+                
+                if user_response.data:
+                    user = user_response.data[0]
+                    return {
+                        "access_token": auth_response.session.access_token,
+                        "token_type": "bearer",
+                        "expires_in": auth_response.session.expires_in or 3600,
+                        "user": {
+                            "id": user['id'],
+                            "email": user['email'],
+                            "display_name": user['display_name']
+                        }
+                    }
+                else:
+                    raise Exception("User profile not found")
+            else:
                 raise Exception("Invalid email or password")
-            
-            user = user_response.data[0]
-            
-            # For demo purposes, accept any password
-            # In production, verify hashed password
-            
-            # Generate JWT token
-            token_data = {
-                'user_id': user['id'],
-                'email': user['email'],
-                'exp': datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
-            }
-            
-            token = jwt.encode(token_data, self.jwt_secret, algorithm=self.jwt_algorithm)
-            
-            return {
-                "access_token": token,
-                "token_type": "bearer",
-                "expires_in": settings.access_token_expire_minutes * 60,
-                "user": {
-                    "id": user['id'],
-                    "email": user['email'],
-                    "display_name": user['display_name']
-                }
-            }
-            
+                
         except Exception as e:
             logger.error(f"Login failed: {e}")
-            raise
-    
-    async def verify_token(self, token: str) -> Dict[str, Any]:
-        """Verify JWT token and return user data"""
-        try:
-            payload = jwt.decode(token, self.jwt_secret, algorithms=[self.jwt_algorithm])
-            user_id = payload.get('user_id')
-            
-            if not user_id:
-                raise Exception("Invalid token")
-            
-            # Get user from database
-            user_response = self.supabase.table('user_profiles').select('*').eq('id', user_id).execute()
-            
-            if not user_response.data:
-                raise Exception("User not found")
-            
-            user = user_response.data[0]
-            return {
-                "id": user['id'],
-                "email": user['email'],
-                "display_name": user['display_name']
-            }
-            
-        except jwt.ExpiredSignatureError:
-            raise Exception("Token has expired")
-        except jwt.InvalidTokenError:
-            raise Exception("Invalid token")
-        except Exception as e:
-            logger.error(f"Token verification failed: {e}")
             raise
     
     async def logout_user(self, user_id: str):
