@@ -13,22 +13,33 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // In your LoginForm component
+const handleSubmit = async (e: React.FormEvent) => {
+
     e.preventDefault();
-    setIsLoading(true);
-
+    
     try {
-      const authData = await authAPI.login(email, password);
-      authUtils.setAuth(authData);
-      toast.success('Login successful!');
-      router.push('/chat');
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Login failed');
-    } finally {
-      setIsLoading(false);
+        const response = await fetch('http://localhost:8000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+        });
+        
+        if (!response.ok) throw new Error('Login failed');
+        
+        const data = await response.json();
+        
+        // Save token and user data
+        localStorage.setItem('authToken', data.access_token);
+        localStorage.setItem('authUser', JSON.stringify(data.user));
+        
+        toast.success('Login successful!');
+        router.push('/chat');
+        
+    } catch (error) {
+        toast.error('Login failed');
     }
-  };
-
+    };
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8">

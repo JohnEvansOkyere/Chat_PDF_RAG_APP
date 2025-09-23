@@ -1,5 +1,4 @@
-'use client'; // optional here if page itself uses hooks
-
+// frontend/src/app/auth/register/page.tsx
 import RegisterForm from '@/components/auth/RegisterForm';
 
 export default function RegisterPage() {
