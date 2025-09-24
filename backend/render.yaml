@@ -43,4 +43,4 @@ services:
       - key: COHERE_EMBEDDING_MODEL
         value: embed-english-v3.0
       - key: CORS_ORIGINS
-        value: "https://your-frontend.vercel.app,http://localhost:3000"
+        value: "https://chat-pdf-rag-app-ugde-82wymx7kx-john-evans-okyeres-projects.vercel.app/,http://localhost:3000"
