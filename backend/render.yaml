@@ -6,8 +6,8 @@ services:
     region: oregon
     rootDir: Chat_PDF_RAG_APP/backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /api/health
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 65 --workers 1
+    healthCheckPath: /api/health  # Keep this as /api/health since that's your main health endpoint
     autoDeploy: true
     envVars:
       - key: ENVIRONMENT
@@ -43,4 +43,4 @@ services:
       - key: COHERE_EMBEDDING_MODEL
         value: embed-english-v3.0
       - key: CORS_ORIGINS
-        value: https://your-frontend.vercel.app
+        value: "https://your-frontend.vercel.app,http://localhost:3000"
