@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { authAPI } from '@/lib/api';
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -73,28 +74,13 @@ export default function RegisterForm() {
     });
     
     try {
-      const res = await fetch('http://localhost:8000/api/auth/register', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          display_name: formData.displayName,
-        }),
-      });
+      const responseData = await authAPI.register(
+        formData.email,
+        formData.password,
+        formData.displayName
+      );
       
-      console.log('Response status:', res.status);
-      console.log('Response headers:', res.headers);
-      
-      const responseData = await res.json();
       console.log('Response data:', responseData);
-      
-      if (!res.ok) {
-        throw new Error(responseData.detail || responseData.message || 'Registration failed');
-      }
       
       // Success
       toast.success('Registration successful! Please sign in.');
@@ -113,7 +99,7 @@ export default function RegisterForm() {
       
     } catch (error: any) {
       console.error('Registration error:', error);
-      toast.error(error.message || 'Registration failed. Please try again.');
+      toast.error(error.response?.data?.detail || error.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
