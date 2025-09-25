@@ -4,7 +4,10 @@
 import axios from 'axios';
 import { AuthResponse, Document, ChatSession, ChatMessage, ChatRequest, ChatResponse } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+if (!API_BASE_URL) {
+  throw new Error("NEXT_PUBLIC_API_URL is not defined");
+}
 
 console.log("API BASE URL:", API_BASE_URL); 
 
