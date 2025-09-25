@@ -5,6 +5,7 @@ Complete chat service with RAG pipeline implementation
 
 import logging
 import uuid
+import re
 from typing import Dict, Any, Optional, List, AsyncGenerator
 from datetime import datetime
 
@@ -127,16 +128,22 @@ class ChatService:
                     self.logger.info(f"Found {len(search_results)} relevant chunks")
                     
                     # Build context from retrieved chunks
+                    # Build context from retrieved chunks (cleaned)
                     context_parts = []
-                    for i, chunk in enumerate(search_results):
-                        context_parts.append(f"[Chunk {i+1}]:\n{chunk['content']}")
-                        sources.append({
-                            'document_id': chunk['document_id'],
-                            'chunk_id': chunk.get('id', ''),
-                            'similarity': chunk.get('similarity', 0),
-                            'page_number': chunk.get('page_number'),
-                        })
-                    
+                    for chunk in search_results:
+                        # Clean the chunk content
+                        content = chunk['content']
+                        
+                        # Remove metadata patterns
+                        content = re.sub(r'Chunk \d+:', '', content)
+                        content = re.sub(r'section; consistent in Chunk \d+', '', content)
+                        content = re.sub(r'\(Cited from [^)]*\)', '', content)
+                        
+                        # Clean up formatting
+                        content = content.replace('**', '').replace('#', '').strip()
+                        
+                        context_parts.append(content)
+
                     context = "\n\n".join(context_parts)
                 else:
                     self.logger.warning("No relevant chunks found for query")
@@ -197,33 +204,7 @@ class ChatService:
             self.logger.error(f"Failed to process message: {e}")
             raise
 
-    async def process_message_stream(self, session_id: str, user_id: str, message: str, document_id: Optional[str] = None) -> AsyncGenerator[str, None]:
-        """Process message with streaming response"""
-        try:
-            # Save user message first
-            user_message_data = {
-                'id': str(uuid.uuid4()),
-                'session_id': session_id,
-                'user_id': user_id,
-                'role': 'user',
-                'content': message,
-                'created_at': datetime.utcnow().isoformat()
-            }
-            
-            self.supabase.table('chat_messages').insert(user_message_data).execute()
-            
-            # For now, return regular response as streaming isn't implemented in LLM service
-            # You can implement proper streaming later if needed
-            response = await self.process_message(session_id, user_id, message, document_id)
-            
-            # Simulate streaming by yielding words
-            words = response['content'].split()
-            for word in words:
-                yield f'"{word} "'
-                
-        except Exception as e:
-            self.logger.error(f"Failed to process streaming message: {e}")
-            yield f'"Error: {str(e)}"'
+
     
     async def _get_conversation_history(self, session_id: str, limit: int = 10) -> List[Dict[str, str]]:
         """Get recent conversation history for context"""

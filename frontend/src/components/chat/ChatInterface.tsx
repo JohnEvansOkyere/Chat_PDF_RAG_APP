@@ -63,8 +63,6 @@ const assistantMessage: ChatMessage = {
   processing_time: response.processing_time,
 };
 
-onNewMessage(assistantMessage);
-
   onNewMessage(assistantMessage);
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Failed to send message');

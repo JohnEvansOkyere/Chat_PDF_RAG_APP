@@ -425,39 +425,7 @@ async def send_message(
         logger.error(f"Failed to process message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/chat/sessions/{session_id}/messages/stream")
-async def send_message_stream(
-    session_id: str,
-    request: ChatRequest,
-    current_user: dict = Depends(get_current_user)
-):
-    """Send message with streaming response"""
-    try:
-        async def generate_stream():
-            try:
-                async for chunk in chat_service.process_message_stream(
-                    session_id=session_id,
-                    user_id=current_user["id"],
-                    message=request.message,
-                    document_id=request.document_id
-                ):
-                    yield f"data: {chunk}\n\n"
-            except Exception as e:
-                logger.error(f"Streaming error: {e}")
-                yield f"data: {{'error': '{str(e)}'}}\n\n"
-        
-        return StreamingResponse(
-            generate_stream(),
-            media_type="text/plain",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-            }
-        )
-    except Exception as e:
-        logger.error(f"Failed to process streaming message: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.delete("/api/chat/sessions/{session_id}")
 async def delete_chat_session(
