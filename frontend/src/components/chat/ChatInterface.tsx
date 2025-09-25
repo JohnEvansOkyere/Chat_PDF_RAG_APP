@@ -60,7 +60,6 @@ const assistantMessage: ChatMessage = {
   content: response.content,    // ✅ Correct field
   created_at: response.created_at, // ✅ Correct field
   tokens_used: response.metadata?.tokens_used,
-  processing_time: response.processing_time,
 };
 
   onNewMessage(assistantMessage);

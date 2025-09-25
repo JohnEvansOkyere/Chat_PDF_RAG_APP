@@ -39,6 +39,6 @@ services:
       - key: OPENAI_EMBEDDING_MODEL
         value: text-embedding-3-small
       - key: CORS_ORIGINS
-        value: "https://chat-pdf-rag-app-ugde.vercel.app, http://localhost:3000"
+        value: "https://chat-pdf-rag-app-udmn.vercel.app, http://localhost:3000"
 
         
