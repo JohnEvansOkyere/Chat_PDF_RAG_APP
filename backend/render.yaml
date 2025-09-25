@@ -29,19 +29,15 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: LLM_PROVIDER
-        value: openai
-      - key: OPENAI_API_KEY
+        value: grok
+      - key: GROK_API_KEY
         sync: false
-      - key: OPENAI_MODEL
-        value: gpt-4o-mini
+      - key: GROK_MODEL
+        value: grok-4-fast-reasoning
       - key: EMBEDDING_PROVIDER
         value: openai
       - key: OPENAI_EMBEDDING_MODEL
-        value: text-embedding-3-large
-      - key: COHERE_API_KEY
-        sync: false
-      - key: COHERE_EMBEDDING_MODEL
-        value: embed-english-v3.0
+        value: text-embedding-3-small
       - key: CORS_ORIGINS
         value: "https://chat-pdf-rag-app-ugde.vercel.app, http://localhost:3000"
 

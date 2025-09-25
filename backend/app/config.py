@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str
     
     # LLM Configuration - Choose provider
-    llm_provider: str = "openai"  # grok, claude, openai
+    llm_provider: str = "grok"  # grok, claude, openai
     
     # Grok (X.AI) Configuration
     grok_api_key: str = ""

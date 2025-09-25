@@ -506,6 +506,17 @@ async def get_usage_stats(current_user: dict = Depends(get_current_user)):
         logger.error(f"Failed to get usage stats: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+@app.get("/test-llm")
+async def test_llm():
+    """Test LLM service directly - no auth required"""
+    try:
+        response = await llm_service.generate_response("Hello, how are you?")
+        return {"success": True, "response": response}
+    except Exception as e:
+        logger.error(f"LLM test failed: {e}")
+        return {"success": False, "error": str(e)}
 # ============================================================================
 # APPLICATION ENTRY POINT
 # ============================================================================

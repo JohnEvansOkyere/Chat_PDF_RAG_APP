@@ -53,10 +53,19 @@ export interface ChatRequest {
 }
 
 export interface ChatResponse {
-  id: string;
-  message: string;
-  context_chunks?: string[];
-  tokens_used?: number;
-  processing_time: number;
-  timestamp: string;
+  message_id: string;
+  content: string;
+  sources?: Array<{
+    document_id: string;
+    chunk_id: string;
+    similarity: number;
+    page_number?: number;
+  }>;
+  metadata?: {
+    tokens_used?: number;
+    model?: string;
+    provider?: string;
+    chunks_found?: number;
+  };
+  created_at: string;
 }

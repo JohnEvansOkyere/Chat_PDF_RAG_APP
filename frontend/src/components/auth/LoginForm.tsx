@@ -15,31 +15,25 @@ export default function LoginForm() {
 
   // In your LoginForm component
 const handleSubmit = async (e: React.FormEvent) => {
-
-    e.preventDefault();
+  e.preventDefault();
+  setIsLoading(true);
+  
+  try {
+    // Use your API instead of hardcoded fetch
+    const response = await authAPI.login(email, password);
     
-    try {
-        const response = await fetch('http://localhost:8000/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-        });
-        
-        if (!response.ok) throw new Error('Login failed');
-        
-        const data = await response.json();
-        
-        // Save token and user data
-        localStorage.setItem('authToken', data.access_token);
-        localStorage.setItem('authUser', JSON.stringify(data.user));
-        
-        toast.success('Login successful!');
-        router.push('/chat');
-        
-    } catch (error) {
-        toast.error('Login failed');
-    }
-    };
+    // The authAPI.login already stores the token, but let's be explicit
+    authUtils.setAuth(response);
+    
+    toast.success('Login successful!');
+    router.push('/chat');
+  } catch (error: any) {
+    console.error('Login error:', error);
+    toast.error(error.response?.data?.detail || 'Login failed');
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8">

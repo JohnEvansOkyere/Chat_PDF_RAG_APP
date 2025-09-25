@@ -55,11 +55,11 @@ export default function ChatInterface({ sessionId, documentId, messages, onNewMe
 const response = await chatAPI.sendMessage(sessionId, request);
 
 const assistantMessage: ChatMessage = {
-  id: response.id,              // Fixed: use response.id
+  id: response.message_id,      // ✅ Correct field
   role: 'assistant',
-  content: response.message,    // Fixed: use response.message  
-  created_at: response.timestamp, // Fixed: use response.timestamp
-  tokens_used: response.tokens_used,
+  content: response.content,    // ✅ Correct field
+  created_at: response.created_at, // ✅ Correct field
+  tokens_used: response.metadata?.tokens_used,
   processing_time: response.processing_time,
 };
 

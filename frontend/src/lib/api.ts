@@ -6,7 +6,7 @@ import { AuthResponse, Document, ChatSession, ChatMessage, ChatRequest, ChatResp
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
-console.log("API BASE URL", process.env.NEXT_PUBLIC_API_URL);
+console.log("API BASE URL:", API_BASE_URL); 
 
 
 // Create axios instance
