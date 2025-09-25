@@ -1,4 +1,6 @@
 // frontend/src/lib/api.ts
+
+// Updated 2025-01-24 - Cache buster
 import axios from 'axios';
 import { AuthResponse, Document, ChatSession, ChatMessage, ChatRequest, ChatResponse } from '@/types';
 
