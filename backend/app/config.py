@@ -68,8 +68,8 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     rate_limit_per_hour: int = 1000
     
-    # CORS - Changed to Union type to handle both string and list
-    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:3001,https://localhost:3000"
+    # CORS - Updated with production URLs
+    cors_origins: Union[str, List[str]] = "http://localhost:3000,http://localhost:3001,https://localhost:3000,https://chat-pdf-rag-app-udmn.vercel.app,https://chat-pdf-rag-app.onrender.com"
     
     @validator('cors_origins', pre=True)
     def parse_cors_origins(cls, v):
