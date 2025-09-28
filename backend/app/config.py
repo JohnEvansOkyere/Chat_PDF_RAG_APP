@@ -65,15 +65,20 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 60
     rate_limit_per_hour: int = 1000
     
-    # CORS - Fixed hardcoded list
-    cors_origins: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "https://localhost:3000",
-        "https://chat-pdf-rag-app.vercel.app",
-        "https://chat-pdf-rag-app-git-master-john-evans-okyeres-projects.vercel.app",
-        "https://chat-pdf-rag-app.onrender.com",
-    ]
+    # CORS - Will be set in __init__
+    cors_origins: List[str] = []
+    
+    def __init__(self, **kwargs):
+        # Force CORS origins regardless of environment variables
+        super().__init__(**kwargs)
+        self.cors_origins = [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://localhost:3000",
+            "https://chat-pdf-rag-app.vercel.app",
+            "https://chat-pdf-rag-app-git-master-john-evans-okyeres-projects.vercel.app",
+            "https://chat-pdf-rag-app.onrender.com",
+        ]
     
     # Helpers
     @property
@@ -111,6 +116,5 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
-        env_ignore = {'cors_origins'}  # Ignore CORS_ORIGINS from .env file
 
 settings = Settings()
