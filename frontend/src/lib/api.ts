@@ -1,24 +1,14 @@
 // frontend/src/lib/api.ts
-
-// Updated 2025-01-24 - Cache buster
 import axios from 'axios';
 import { AuthResponse, Document, ChatSession, ChatMessage, ChatRequest, ChatResponse } from '@/types';
 
-// Debug environment variables
-console.log('🔍 Environment Debug:', {
-  NODE_ENV: process.env.NODE_ENV,
-  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
-  all_NEXT_PUBLIC: Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_'))
-});
+// Force the production URL directly - no environment variable dependency
+const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? 'https://chat-pdf-rag-app.onrender.com/api'  // Production
+  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'; // Development
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-console.log("🚀 API BASE URL:", API_BASE_URL); 
-
-if (!API_BASE_URL) {
-  console.error("❌ NEXT_PUBLIC_API_URL is not defined");
-  console.error("Available env vars:", Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_')));
-  throw new Error("NEXT_PUBLIC_API_URL is not defined");
-}
+console.log("🚀 API BASE URL (FORCED):", API_BASE_URL);
+console.log("🌍 Current hostname:", typeof window !== 'undefined' ? window.location.hostname : 'server-side');
 
 // Create axios instance
 const api = axios.create({
@@ -32,7 +22,7 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   console.log('🌐 Making request to:', config.baseURL + config.url);
   
-  const token = localStorage.getItem('access_token'); // Use consistent key
+  const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -52,7 +42,7 @@ api.interceptors.response.use(
       message: error.message
     });
     
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
       window.location.href = '/auth/login';
@@ -82,8 +72,10 @@ export const authAPI = {
     
     // Store token and user data consistently
     const { access_token, user } = response.data;
-    localStorage.setItem('access_token', access_token);
-    localStorage.setItem('user', JSON.stringify(user));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('user', JSON.stringify(user));
+    }
     
     return response.data;
   },
@@ -94,8 +86,10 @@ export const authAPI = {
       return response.data;
     } finally {
       // Always clear local storage on logout
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('user');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+      }
     }
   },
 
