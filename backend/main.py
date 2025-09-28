@@ -142,6 +142,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+print(f"CORS CONFIG: origins={settings.cors_origins}, credentials=False")  # Add this line
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(LoggingMiddleware)
 
