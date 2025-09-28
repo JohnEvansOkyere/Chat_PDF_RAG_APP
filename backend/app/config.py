@@ -1,61 +1,60 @@
 # backend/app/config.py
 """
-Fixed configuration with correct Pydantic imports
+Fixed configuration with correct Pydantic imports + CORS validator
 """
-import os
-from typing import List, Union
+from typing import List
 from pydantic_settings import BaseSettings
-from pydantic import validator
-import json 
+from pydantic import field_validator
+
 
 class Settings(BaseSettings):
-    """Application settings with Grok and Claude support"""
-    
+    """Application settings with Grok, Claude, and OpenAI support"""
+
     # Application
     app_name: str = "VexaAI RAG Chat PDF API"
     version: str = "1.0.0"
     environment: str = "development"
     debug: bool = True
     log_level: str = "INFO"
-    
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
-    
+
     # Security
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
-    
+
     # Database
     database_url: str
     supabase_url: str
     supabase_service_role_key: str
-    
-    # LLM Configuration - Choose provider
+
+    # LLM Configuration
     llm_provider: str = "grok"  # grok, claude, openai
-    
-    # Grok (X.AI) Configuration
+
+    # Grok (X.AI)
     grok_api_key: str = ""
     grok_model: str = "grok-beta"
-    
-    # Claude (Anthropic) Configuration
+
+    # Claude (Anthropic)
     claude_api_key: str = ""
     claude_model: str = "claude-3-sonnet-20240229"
-    
-    # OpenAI Configuration
+
+    # OpenAI
     openai_api_key: str = ""
     openai_model: str = "gpt-4-turbo-preview"
-    
-    # Embedding Configuration
+
+    # Embeddings
     embedding_provider: str = "openai"  # openai, cohere
     openai_embedding_model: str = "text-embedding-3-large"
-    
-    # Cohere Configuration
+
+    # Cohere
     cohere_api_key: str = ""
     cohere_embedding_model: str = "embed-english-v3.0"
-    
-    # Processing Configuration
+
+    # Processing
     max_file_size_mb: int = 50
     chunk_size: int = 1000
     chunk_overlap: int = 200
@@ -63,49 +62,44 @@ class Settings(BaseSettings):
     relevance_threshold: float = 0.7
     max_context_length: int = 8000
     max_response_length: int = 500
-    
+
     # Rate Limiting
     rate_limit_per_minute: int = 60
     rate_limit_per_hour: int = 1000
-    
-    # CORS - Updated with production URLs
+
+    # CORS
     cors_origins: List[str] = [
         "http://localhost:3000",
-        "http://localhost:3001", 
+        "http://localhost:3001",
         "https://localhost:3000",
         "https://chat-pdf-rag-app.vercel.app",
         "https://chat-pdf-rag-app-git-master-john-evans-okyeres-projects.vercel.app",
-        "https://chat-pdf-rag-app.onrender.com"
-        ]
-    
+        "https://chat-pdf-rag-app.onrender.com",
+    ]
+
+    @field_validator("cors_origins", mode="before")
+    def parse_cors_origins(cls, v):
+        """Allow both JSON list and comma-separated string in .env"""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",")]
+        return v
+
+    # Helpers
     @property
     def max_file_size_bytes(self) -> int:
         return self.max_file_size_mb * 1024 * 1024
-    
+
     @property
     def current_llm_config(self) -> dict:
         """Get current LLM configuration based on provider"""
         if self.llm_provider == "grok":
-            return {
-                "provider": "grok",
-                "api_key": self.grok_api_key,
-                "model": self.grok_model
-            }
+            return {"provider": "grok", "api_key": self.grok_api_key, "model": self.grok_model}
         elif self.llm_provider == "claude":
-            return {
-                "provider": "claude",
-                "api_key": self.claude_api_key,
-                "model": self.claude_model
-            }
+            return {"provider": "claude", "api_key": self.claude_api_key, "model": self.claude_model}
         elif self.llm_provider == "openai":
-            return {
-                "provider": "openai",
-                "api_key": self.openai_api_key,
-                "model": self.openai_model
-            }
-        else:
-            raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
-    
+            return {"provider": "openai", "api_key": self.openai_api_key, "model": self.openai_model}
+        raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
+
     @property
     def current_embedding_config(self) -> dict:
         """Get current embedding configuration"""
@@ -113,19 +107,19 @@ class Settings(BaseSettings):
             return {
                 "provider": "openai",
                 "api_key": self.openai_api_key,
-                "model": self.openai_embedding_model
+                "model": self.openai_embedding_model,
             }
         elif self.embedding_provider == "cohere":
             return {
                 "provider": "cohere",
                 "api_key": self.cohere_api_key,
-                "model": self.cohere_embedding_model
+                "model": self.cohere_embedding_model,
             }
-        else:
-            raise ValueError(f"Unsupported embedding provider: {self.embedding_provider}")
-    
+        raise ValueError(f"Unsupported embedding provider: {self.embedding_provider}")
+
     class Config:
         env_file = ".env"
         case_sensitive = False
+
 
 settings = Settings()
