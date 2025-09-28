@@ -20,7 +20,7 @@ const api = axios.create({
 
 // Request interceptor to add auth token and debug
 api.interceptors.request.use((config) => {
-  console.log('🌐 Making request to:', config.baseURL + config.url);
+  console.log('🌐 Making request to:', (config.baseURL || '') + (config.url || ''));
   
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   
@@ -37,7 +37,7 @@ api.interceptors.response.use(
     console.error('❌ API Error:', {
       url: error.config?.url,
       baseURL: error.config?.baseURL,
-      fullURL: error.config?.baseURL + error.config?.url,
+      fullURL: (error.config?.baseURL || '') + (error.config?.url || ''),
       status: error.response?.status,
       message: error.message
     });
