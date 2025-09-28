@@ -72,14 +72,8 @@ class Settings(BaseSettings):
     
     @property
     def cors_origins(self) -> List[str]:
-        """CORS origins - hardcoded to avoid environment variable conflicts"""
-        return [
-            "http://localhost:3000",
-            "http://localhost:3001", 
-            "https://localhost:3000",
-            "https://*.vercel.app",  # Wildcard for all Vercel deployments
-            "https://chat-pdf-rag-app.onrender.com"
-        ]
+        """CORS origins - using wildcard to allow all origins"""
+        return ["*"]
     
     @property
     def current_llm_config(self) -> dict:
