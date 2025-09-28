@@ -4,13 +4,21 @@
 import axios from 'axios';
 import { AuthResponse, Document, ChatSession, ChatMessage, ChatRequest, ChatResponse } from '@/types';
 
+// Debug environment variables
+console.log('🔍 Environment Debug:', {
+  NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  all_NEXT_PUBLIC: Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_'))
+});
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+console.log("🚀 API BASE URL:", API_BASE_URL); 
+
 if (!API_BASE_URL) {
+  console.error("❌ NEXT_PUBLIC_API_URL is not defined");
+  console.error("Available env vars:", Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_')));
   throw new Error("NEXT_PUBLIC_API_URL is not defined");
 }
-
-console.log("API BASE URL:", API_BASE_URL); 
-
 
 // Create axios instance
 const api = axios.create({
@@ -20,8 +28,10 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token
+// Request interceptor to add auth token and debug
 api.interceptors.request.use((config) => {
+  console.log('🌐 Making request to:', config.baseURL + config.url);
+  
   const token = localStorage.getItem('access_token'); // Use consistent key
   
   if (token) {
@@ -34,6 +44,14 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('❌ API Error:', {
+      url: error.config?.url,
+      baseURL: error.config?.baseURL,
+      fullURL: error.config?.baseURL + error.config?.url,
+      status: error.response?.status,
+      message: error.message
+    });
+    
     if (error.response?.status === 401) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
@@ -46,6 +64,7 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   register: async (email: string, password: string, displayName?: string) => {
+    console.log('📝 Attempting registration...');
     const response = await api.post('/auth/register', {
       email,
       password,
@@ -55,6 +74,7 @@ export const authAPI = {
   },
 
   login: async (email: string, password: string): Promise<AuthResponse> => {
+    console.log('🔐 Attempting login...');
     const response = await api.post('/auth/login', {
       email,
       password,
