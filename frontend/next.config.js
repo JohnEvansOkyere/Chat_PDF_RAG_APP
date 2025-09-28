@@ -1,10 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+    console.log('API URL in rewrites:', apiUrl); // Debug log
+    
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/:path*`,
+        destination: `${apiUrl}/:path*`,
       },
     ];
   },
@@ -15,12 +18,7 @@ const nextConfig = {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
-
-  // Enable experimental features if needed
-  experimental: {
-    // Add any experimental features here
-  },
-
+  
   // Add domains for images if you're using next/image with external URLs
   images: {
     domains: [
