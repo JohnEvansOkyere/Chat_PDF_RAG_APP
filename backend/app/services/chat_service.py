@@ -1,6 +1,8 @@
 # backend/app/services/chat_service.py
 """
-Complete chat service with RAG pipeline implementation
+Complete chat service with RAG pipeline implementation.
+Handles creation, retrieval, and deletion of chat sessions, 
+and manages message processing with context-aware responses.
 """
 
 import logging
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class ChatService:
     def __init__(self):
+        """Initialize ChatService with config, database client, vector service, and LLM service"""
         self.config = settings
         self.supabase = get_supabase_client()
         self.vector_service = VectorService()
@@ -25,8 +28,19 @@ class ChatService:
         self.logger = logger
     
     async def create_session(self, user_id: str, title: str = "New Chat", document_id: Optional[str] = None) -> Dict[str, Any]:
-        """Create new chat session"""
+        """
+        Create a new chat session for the user.
+
+        Args:
+            user_id (str): ID of the user starting the session.
+            title (str): Session title, defaults to "New Chat".
+            document_id (Optional[str]): Optional ID of document associated with this chat.
+
+        Returns:
+            Dict[str, Any]: Created session record from Supabase.
+        """
         try:
+            # Prepare session payload
             session_data = {
                 'id': str(uuid.uuid4()),
                 'user_id': user_id,
@@ -37,6 +51,7 @@ class ChatService:
                 'updated_at': datetime.utcnow().isoformat()
             }
             
+            # Insert into Supabase
             response = self.supabase.table('chat_sessions').insert(session_data).execute()
             
             if response.data:
@@ -49,7 +64,15 @@ class ChatService:
             raise
 
     async def get_user_sessions(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get user's chat sessions"""
+        """
+        Retrieve all chat sessions for a specific user.
+
+        Args:
+            user_id (str): User identifier.
+
+        Returns:
+            List[Dict[str, Any]]: List of sessions sorted by last update.
+        """
         try:
             response = self.supabase.table('chat_sessions').select('*').eq('user_id', user_id).order('updated_at', desc=True).execute()
             return response.data or []
@@ -58,15 +81,24 @@ class ChatService:
             return []
 
     async def get_session_with_messages(self, session_id: str, user_id: str) -> Dict[str, Any]:
-        """Get session with messages"""
+        """
+        Get a single session and all messages within it.
+
+        Args:
+            session_id (str): Chat session ID.
+            user_id (str): User ID (for ownership check).
+
+        Returns:
+            Dict[str, Any]: Session data including messages.
+        """
         try:
-            # Get session
+            # Fetch session info
             session_response = self.supabase.table('chat_sessions').select('*').eq('id', session_id).eq('user_id', user_id).single().execute()
             
             if not session_response.data:
                 raise Exception("Session not found")
             
-            # Get messages for this session
+            # Fetch all messages in this session
             messages_response = self.supabase.table('chat_messages').select('*').eq('session_id', session_id).order('created_at').execute()
             
             session = session_response.data
@@ -78,12 +110,21 @@ class ChatService:
             raise
 
     async def delete_session(self, session_id: str, user_id: str) -> bool:
-        """Delete chat session"""
+        """
+        Delete a session and its messages.
+
+        Args:
+            session_id (str): ID of the chat session.
+            user_id (str): ID of the user.
+
+        Returns:
+            bool: True if deletion succeeded.
+        """
         try:
-            # Delete messages first
+            # Delete messages first (maintain DB consistency)
             self.supabase.table('chat_messages').delete().eq('session_id', session_id).execute()
             
-            # Delete session
+            # Delete the session record
             self.supabase.table('chat_sessions').delete().eq('id', session_id).eq('user_id', user_id).execute()
             return True
             
@@ -92,9 +133,28 @@ class ChatService:
             raise
 
     async def process_message(self, session_id: str, user_id: str, message: str, document_id: Optional[str] = None) -> Dict[str, Any]:
-        """Process message and generate response using RAG pipeline"""
+        """
+        Process a user message through the RAG pipeline and return AI response.
+
+        Steps:
+            1. Save user message.
+            2. Retrieve recent conversation history for context.
+            3. Search for relevant document chunks (via vector DB).
+            4. Generate AI response using LLM + context.
+            5. Save assistant message.
+            6. Update session timestamp.
+
+        Args:
+            session_id (str): ID of the session.
+            user_id (str): ID of the user.
+            message (str): User’s input message.
+            document_id (Optional[str]): Optional linked document ID.
+
+        Returns:
+            Dict[str, Any]: AI response, metadata, and references.
+        """
         try:
-            # Save user message
+            # Step 1: Save user message to DB
             user_message_data = {
                 'id': str(uuid.uuid4()),
                 'session_id': session_id,
@@ -106,40 +166,36 @@ class ChatService:
             
             self.supabase.table('chat_messages').insert(user_message_data).execute()
             
-            # Get conversation history for context
+            # Step 2: Get conversation history for context
             conversation_history = await self._get_conversation_history(session_id, limit=10)
             
-            # Search for relevant chunks using RAG
+            # Step 3: Initialize RAG variables
             relevant_chunks = []
             context = ""
             sources = []
             
             try:
-                # Use vector search to find relevant document chunks
+                # Perform vector search for related document snippets
                 search_results = await self.vector_service.search_similar_chunks(
                     user_id=user_id,
                     query=message,
                     document_id=document_id,
                     limit=5,
-                    similarity_threshold=0.3  # Lower threshold for more results
+                    similarity_threshold=0.3  # Lower threshold to capture more possible results
                 )
                 
                 if search_results:
                     self.logger.info(f"Found {len(search_results)} relevant chunks")
                     
-                    # Build context from retrieved chunks
-                    # Build context from retrieved chunks (cleaned)
+                    # Build context string by cleaning retrieved chunks
                     context_parts = []
                     for chunk in search_results:
-                        # Clean the chunk content
                         content = chunk['content']
                         
-                        # Remove metadata patterns
+                        # Remove extra metadata/formatting
                         content = re.sub(r'Chunk \d+:', '', content)
                         content = re.sub(r'section; consistent in Chunk \d+', '', content)
                         content = re.sub(r'\(Cited from [^)]*\)', '', content)
-                        
-                        # Clean up formatting
                         content = content.replace('**', '').replace('#', '').strip()
                         
                         context_parts.append(content)
@@ -150,10 +206,11 @@ class ChatService:
                     context = "No relevant document content found."
                     
             except Exception as e:
+                # Vector search error should not block chat response
                 self.logger.error(f"Vector search failed: {e}")
                 context = "Error retrieving document content."
             
-            # Generate response using LLM
+            # Step 4: Generate LLM response
             try:
                 llm_response = await self.llm_service.generate_response(
                     user_message=message,
@@ -170,11 +227,12 @@ class ChatService:
                 }
                 
             except Exception as e:
+                # Gracefully handle LLM errors
                 self.logger.error(f"LLM generation failed: {e}")
                 ai_response = "I apologize, but I encountered an error while processing your question. Please try again."
                 metadata = {'error': str(e)}
             
-            # Save AI response
+            # Step 5: Save assistant (AI) message
             ai_message_data = {
                 'id': str(uuid.uuid4()),
                 'session_id': session_id,
@@ -187,7 +245,7 @@ class ChatService:
             
             ai_message_response = self.supabase.table('chat_messages').insert(ai_message_data).execute()
             
-            # Update session timestamp
+            # Step 6: Update session last updated timestamp
             self.supabase.table('chat_sessions').update({
                 'updated_at': datetime.utcnow().isoformat()
             }).eq('id', session_id).execute()
@@ -204,17 +262,24 @@ class ChatService:
             self.logger.error(f"Failed to process message: {e}")
             raise
 
-
-    
     async def _get_conversation_history(self, session_id: str, limit: int = 10) -> List[Dict[str, str]]:
-        """Get recent conversation history for context"""
+        """
+        Fetch recent conversation history for a session.
+
+        Args:
+            session_id (str): ID of the chat session.
+            limit (int): Number of past exchanges to return.
+
+        Returns:
+            List[Dict[str, str]]: Recent messages in format {role, content}.
+        """
         try:
             response = self.supabase.table('chat_messages').select('role, content').eq('session_id', session_id).order('created_at', desc=True).limit(limit * 2).execute()
             
             if not response.data:
                 return []
             
-            # Reverse to get chronological order and format for LLM
+            # Reverse to chronological order and keep only the last `limit` messages
             messages = []
             for msg in reversed(response.data):
                 messages.append({
@@ -222,7 +287,7 @@ class ChatService:
                     'content': msg['content']
                 })
             
-            return messages[-limit:]  # Return last 'limit' messages
+            return messages[-limit:]  
             
         except Exception as e:
             self.logger.error(f"Failed to get conversation history: {e}")

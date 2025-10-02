@@ -71,7 +71,6 @@ class AuthService:
             
             user = user_response.data[0]
             
-            # For demo purposes, accept any password
             # In production, verify against hashed password
             
             # Generate JWT token
@@ -100,7 +99,7 @@ class AuthService:
     
 
     
-    # Add this method to your AuthService class
+    # Add this method to the AuthService class
 
     async def verify_token(self, token: str) -> Dict[str, Any]:
         """Verify JWT token and return user data"""
@@ -135,7 +134,7 @@ class AuthService:
 
     async def logout_user(self, user_id: str):
         """Logout user (placeholder - JWT is stateless)"""
-        # In a real app, you might blacklist the token
+        # In a real app, I might blacklist the token
         logger.info(f"User {user_id} logged out")
     
     async def get_user_profile(self, user_id: str) -> Dict[str, Any]:

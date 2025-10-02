@@ -1,6 +1,8 @@
 # backend/app/services/llm_service.py
 """
-LLM service with support for Grok, Claude, and OpenAI APIs
+LLM service with support for Grok, Claude, and OpenAI APIs.
+This service abstracts provider-specific API calls behind a unified interface
+to generate responses from different Large Language Models (LLMs).
 """
 
 import logging
@@ -14,17 +16,34 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 class LLMService:
+    """
+    Service for managing LLM API calls.
+    
+    Supports:
+        - Grok (xAI)
+        - Claude (Anthropic)
+        - OpenAI GPT models
+    
+    Provides:
+        - Unified response generation interface
+        - Streaming responses (simulated, extendable later)
+        - Connection test utility
+    """
     def __init__(self):
         self.config = settings
         self.logger = logger
         self._initialize_client()
     
     def _initialize_client(self):
-        """Initialize HTTP client and API details based on provider"""
+        """
+        Initialize HTTP client and configure API details 
+        (endpoint, headers, and default model) based on the selected provider.
+        """
         self.client = httpx.AsyncClient(timeout=60.0)
 
         provider = self.config.llm_provider.lower()
 
+        # Configure each provider
         if provider == "grok":
             self.api_url = "https://api.x.ai/v1/chat/completions"
             self.headers = {
@@ -59,8 +78,19 @@ class LLMService:
         context: str = "",
         conversation_history: List[Dict[str, str]] = None
     ) -> Dict[str, Any]:
-        """Generate response using configured LLM provider"""
+        """
+        Generate a response using the configured LLM provider.
+        
+        Args:
+            user_message (str): The user query or prompt.
+            context (str): Context text (e.g., retrieved from RAG pipeline).
+            conversation_history (List[Dict]): Previous chat exchanges.
+        
+        Returns:
+            Dict[str, Any]: Model response, tokens used, provider, etc.
+        """
         try:
+            # System prompt defines assistant rules and formatting
             system_prompt = f"""You are VexaAI, an intelligent assistant specialized in answering questions about PDF documents.
                 You have been developed by John Evans Okyere to provide accurate, concise, and helpful responses.
 
@@ -83,6 +113,7 @@ class LLMService:
 
                 Context from document: {context}"""
 
+            # Dispatch request to the correct provider
             provider = self.config.llm_provider.lower()
             if provider == "grok":
                 return await self._generate_grok_response(system_prompt, user_message, conversation_history)
@@ -98,7 +129,10 @@ class LLMService:
             raise
     
     async def _generate_grok_response(self, system_prompt: str, user_message: str, history: List[Dict] = None) -> Dict[str, Any]:
-        """Generate response using Grok API"""
+        """
+        Generate response using Grok API.
+        Includes last 8 conversation turns for continuity.
+        """
         try:
             messages = [{"role": "system", "content": system_prompt}]
             
@@ -139,7 +173,10 @@ class LLMService:
             raise
     
     async def _generate_claude_response(self, system_prompt: str, user_message: str, history: List[Dict] = None) -> Dict[str, Any]:
-        """Generate response using Claude API"""
+        """
+        Generate response using Claude API.
+        Uses Anthropic's `messages` endpoint.
+        """
         try:
             messages = []
             
@@ -179,7 +216,10 @@ class LLMService:
             raise
     
     async def _generate_openai_response(self, system_prompt: str, user_message: str, history: List[Dict] = None) -> Dict[str, Any]:
-        """Generate response using OpenAI API"""
+        """
+        Generate response using OpenAI API.
+        Uses Chat Completions endpoint.
+        """
         try:
             messages = [{"role": "system", "content": system_prompt}]
             
@@ -221,7 +261,12 @@ class LLMService:
             raise
 
     async def test_connection(self) -> str:
-        """Test LLM connection"""
+        """
+        Test LLM connection by sending a simple probe message.
+        
+        Returns:
+            str: LLM response text confirming successful connection.
+        """
         try:
             response = await self.generate_response("Hello, please respond with 'Connection successful'")
             return response['response']
@@ -235,22 +280,29 @@ class LLMService:
         context: str = "",
         conversation_history: List[Dict[str, str]] = None
     ) -> AsyncGenerator[str, None]:
-        """Generate streaming response (currently simulated, can be enhanced later)"""
+        """
+        Generate streaming response (simulated).
+        Currently streams the response word by word with delay.
+        Can be replaced with true server-sent events or WebSocket in production.
+        """
         try:
-            # For now, generate regular response and stream it word by word
+            # First, generate a full response
             response = await self.generate_response(user_message, context, conversation_history)
             
+            # Stream word by word for UI effect
             words = response['response'].split()
             for word in words:
                 yield f"{word} "
-                await asyncio.sleep(0.05)  # Small delay for streaming effect
+                await asyncio.sleep(0.05)  # Artificial delay for realism
                 
         except Exception as e:
             self.logger.error(f"Streaming response failed: {e}")
             yield f"Error: {str(e)}"
     
     async def __aenter__(self):
+        """Support async context manager entry"""
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Ensure httpx client is properly closed"""
         await self.client.aclose()

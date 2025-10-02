@@ -1,6 +1,15 @@
 # backend/app/services/pdf_processor.py
 """
-Cloud-adapted PDF processing service from your original pdf_processor.py
+Cloud-adapted PDF processing service
+------------------------------------
+
+This service is responsible for handling all PDF-related tasks in a cloud-friendly way:
+    - Validating PDF files (size, format, existence)
+    - Extracting text content from PDF pages using PyMuPDF
+    - Splitting large documents into smaller chunks for LLM processing
+    - Generating statistics & text previews for downstream use
+
+This version is adapted from your original processor, optimized for cloud deployments.
 """
 
 import os
@@ -10,7 +19,7 @@ from typing import List, Dict, Any, Optional
 from pathlib import Path
 import tempfile
 
-import fitz  # PyMuPDF (better than pdfplumber for cloud)
+import fitz  # PyMuPDF → fast & reliable PDF parsing, better than pdfplumber in cloud
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.config import settings
@@ -18,9 +27,10 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 class CloudPDFProcessor:
-    """Cloud-adapted version of your original PDFProcessor"""
+    """Main class for PDF processing in a cloud environment"""
     
     def __init__(self):
+        # Initialize text splitter → breaks large texts into chunks for embeddings/LLMs
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=settings.chunk_size,
             chunk_overlap=settings.chunk_overlap,
@@ -29,8 +39,11 @@ class CloudPDFProcessor:
         )
         self.logger = logger
     
+    # ---------------------------------------------------------
+    # STEP 1: PDF Validation
+    # ---------------------------------------------------------
     def validate_pdf_file(self, file_path: str) -> bool:
-        """Validate PDF file (adapted from your original)"""
+        """Check if a given file is a valid PDF and within allowed size"""
         try:
             if not os.path.exists(file_path):
                 self.logger.error(f"File not found: {file_path}")
@@ -51,15 +64,21 @@ class CloudPDFProcessor:
             self.logger.error(f"Error validating PDF file: {str(e)}")
             return False
     
+    # ---------------------------------------------------------
+    # STEP 2: PDF Loading & Extraction
+    # ---------------------------------------------------------
     async def load_pdf(self, file_path: str) -> List[Dict[str, Any]]:
-        """Load PDF and extract text (cloud-adapted from your original)"""
+        """
+        Open and read PDF file using PyMuPDF.
+        Extracts plain text from each page along with metadata.
+        """
         try:
             if not self.validate_pdf_file(file_path):
                 raise ValueError(f"Invalid PDF file: {file_path}")
             
             self.logger.info(f"Loading PDF: {file_path}")
             
-            # Use PyMuPDF for better performance in cloud environment
+            # Open PDF → page by page
             doc = fitz.open(file_path)
             documents = []
             
@@ -67,7 +86,7 @@ class CloudPDFProcessor:
                 page = doc[page_num]
                 page_text = page.get_text()
                 
-                if page_text.strip():  # Only add non-empty pages
+                if page_text.strip():  # Skip empty pages
                     doc_data = {
                         'page_content': page_text,
                         'metadata': {
@@ -92,8 +111,14 @@ class CloudPDFProcessor:
             self.logger.error(f"Error loading PDF {file_path}: {str(e)}")
             raise Exception(f"Failed to load PDF: {str(e)}")
     
+    # ---------------------------------------------------------
+    # STEP 3: Document Splitting
+    # ---------------------------------------------------------
     async def split_documents(self, documents: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Split documents into chunks (adapted from your original)"""
+        """
+        Break down extracted PDF text into smaller chunks
+        → Makes it easier for embeddings & LLM context handling
+        """
         try:
             self.logger.info(f"Splitting {len(documents)} documents into chunks")
             
@@ -101,7 +126,7 @@ class CloudPDFProcessor:
             chunk_id = 0
             
             for doc in documents:
-                # Split the document content
+                # Use text splitter for recursive chunking
                 chunks = self.text_splitter.split_text(doc['page_content'])
                 
                 for chunk_text in chunks:
@@ -117,7 +142,7 @@ class CloudPDFProcessor:
                     all_chunks.append(chunk_data)
                     chunk_id += 1
             
-            # Add total chunks to all metadata
+            # Attach total chunk info for reference
             for chunk in all_chunks:
                 chunk['metadata']['total_chunks'] = len(all_chunks)
             
@@ -128,20 +153,22 @@ class CloudPDFProcessor:
             self.logger.error(f"Error splitting documents: {str(e)}")
             raise Exception(f"Failed to split documents: {str(e)}")
     
+    # ---------------------------------------------------------
+    # STEP 4: Full Pipeline
+    # ---------------------------------------------------------
     async def process_pdf(self, file_path: str) -> Dict[str, Any]:
-        """Complete PDF processing pipeline (adapted from your original)"""
+        """
+        Complete PDF processing pipeline:
+            1. Load PDF pages
+            2. Split into chunks
+            3. Generate statistics
+            4. Create text preview
+        """
         try:
-            # Load PDF
-            documents = await self.load_pdf(file_path)
-            
-            # Split into chunks
-            chunked_documents = await self.split_documents(documents)
-            
-            # Generate stats (adapted from your get_document_stats)
-            stats = self.get_document_stats(chunked_documents)
-            
-            # Generate preview
-            preview = self.extract_text_preview(chunked_documents)
+            documents = await self.load_pdf(file_path)          # Load
+            chunked_documents = await self.split_documents(documents)  # Split
+            stats = self.get_document_stats(chunked_documents)  # Stats
+            preview = self.extract_text_preview(chunked_documents)  # Preview
             
             return {
                 'chunks': chunked_documents,
@@ -153,15 +180,17 @@ class CloudPDFProcessor:
             self.logger.error(f"Error processing PDF: {str(e)}")
             raise
     
+    # ---------------------------------------------------------
+    # STEP 5: Utilities (Stats + Preview)
+    # ---------------------------------------------------------
     def get_document_stats(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Get document statistics (adapted from your original)"""
+        """Generate basic statistics from chunked documents"""
         if not documents:
             return {}
         
         total_chars = sum(len(doc['content']) for doc in documents)
         total_words = sum(len(doc['content'].split()) for doc in documents)
         
-        # Get unique source files and pages
         source_files = set(doc['metadata'].get('source_file', 'unknown') for doc in documents)
         pages = set(doc['metadata'].get('page_number', 0) for doc in documents)
         
@@ -179,32 +208,18 @@ class CloudPDFProcessor:
         return stats
     
     def extract_text_preview(self, documents: List[Dict[str, Any]], max_length: int = 500) -> str:
-        """Extract text preview (adapted from your original)"""
+        """Return a short preview (first few chunks of extracted text)"""
         if not documents:
             return "No content available"
         
-        # Get text from first few chunks
         preview_text = ""
-        for doc in documents[:3]:  # First 3 chunks
+        for doc in documents[:3]:  # Take first 3 chunks only
             preview_text += doc['content'] + "\n\n"
             if len(preview_text) > max_length:
                 break
         
-        # Truncate if necessary
+        # Truncate if too long
         if len(preview_text) > max_length:
             preview_text = preview_text[:max_length] + "..."
         
         return preview_text.strip()
-
-
-
-
-
-
-
-
-
-
-
-
-

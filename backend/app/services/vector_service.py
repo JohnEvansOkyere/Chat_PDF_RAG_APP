@@ -1,6 +1,16 @@
 # backend/app/services/vector_service.py  
 """
-Vector service with embedding support for different providers
+Vector Service
+--------------
+
+Handles everything related to vector embeddings and similarity search:
+    - Generate embeddings (OpenAI / Cohere)
+    - Store embeddings into Supabase
+    - Perform similarity search over document chunks
+    - Test embedding functionality
+
+This service connects the PDF processing pipeline with vector databases
+to enable RAG-style question answering.
 """
 
 import logging
@@ -14,17 +24,23 @@ from app.database import get_supabase_client
 logger = logging.getLogger(__name__)
 
 class VectorService:
+    """Service class for embeddings + vector operations"""
+    
     def __init__(self):
         self.config = settings
         self.supabase = get_supabase_client()
         self.logger = logger
         self._initialize_embedding_client()
     
+    # ---------------------------------------------------------
+    # STEP 1: Initialize Embedding Client
+    # ---------------------------------------------------------
     def _initialize_embedding_client(self):
-        """Initialize embedding client"""
+        """Setup HTTP client and config for selected embedding provider"""
         self.client = httpx.AsyncClient(timeout=60.0)
         
         if self.config.embedding_provider == "openai":
+            # OpenAI embeddings
             self.embedding_url = "https://api.openai.com/v1/embeddings"
             self.headers = {
                 "Authorization": f"Bearer {self.config.openai_api_key}",
@@ -33,6 +49,7 @@ class VectorService:
             self.embedding_model = self.config.openai_embedding_model
             
         elif self.config.embedding_provider == "cohere":
+            # Cohere embeddings
             self.embedding_url = "https://api.cohere.ai/v1/embed"
             self.headers = {
                 "Authorization": f"Bearer {self.config.cohere_api_key}",
@@ -40,8 +57,14 @@ class VectorService:
             }
             self.embedding_model = self.config.cohere_embedding_model
     
+    # ---------------------------------------------------------
+    # STEP 2: Embedding Generation
+    # ---------------------------------------------------------
     async def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for text"""
+        """
+        Generate embedding for given text.
+        Works with both OpenAI and Cohere providers.
+        """
         try:
             if self.config.embedding_provider == "openai":
                 payload = {
@@ -83,8 +106,14 @@ class VectorService:
             self.logger.error(f"Error generating embedding: {e}")
             raise
     
+    # ---------------------------------------------------------
+    # STEP 3: Document Embeddings Creation
+    # ---------------------------------------------------------
     async def create_document_embeddings(self, document_id: str, chunks: List[Dict[str, Any]]):
-        """Create embeddings for document chunks"""
+        """
+        Create embeddings for all chunks in a document.
+        Stores the embeddings + metadata into Supabase.
+        """
         try:
             chunk_records = []
             
@@ -104,7 +133,7 @@ class VectorService:
                 
                 chunk_records.append(chunk_record)
             
-            # Batch insert
+            # Batch insert embeddings into Supabase
             response = self.supabase.table('document_chunks').insert(chunk_records).execute()
             
             if not response.data:
@@ -116,6 +145,9 @@ class VectorService:
             self.logger.error(f"Error creating document embeddings: {e}")
             raise
     
+    # ---------------------------------------------------------
+    # STEP 4: Vector Search
+    # ---------------------------------------------------------
     async def search_similar_chunks(
         self,
         user_id: str,
@@ -124,22 +156,34 @@ class VectorService:
         limit: int = 10,
         similarity_threshold: float = 0.7
     ) -> List[Dict[str, Any]]:
-        """Search for similar chunks"""
+        """
+        Search for similar chunks based on query text.
+        
+        Steps:
+            1. Generate query embedding
+            2. Select relevant document IDs (all or specific)
+            3. Call Supabase RPC for similarity search
+        """
         try:
             query_embedding = await self.generate_embedding(query)
             
-            # Get user's document IDs if not specified
+            # If no specific document → get all user's completed documents
             document_ids = None
             if document_id:
                 document_ids = [document_id]
             else:
-                docs_response = self.supabase.table('documents').select('id').eq('user_id', user_id).eq('status', 'completed').execute()
+                docs_response = self.supabase.table('documents') \
+                    .select('id') \
+                    .eq('user_id', user_id) \
+                    .eq('status', 'completed') \
+                    .execute()
+                
                 if docs_response.data:
                     document_ids = [doc['id'] for doc in docs_response.data]
                 else:
                     return []
             
-            # Vector search
+            # Perform vector similarity search via Supabase function
             search_response = self.supabase.rpc('search_document_chunks', {
                 'query_embedding': query_embedding,
                 'document_ids': document_ids,
@@ -153,8 +197,11 @@ class VectorService:
             self.logger.error(f"Error searching similar chunks: {e}")
             raise
     
+    # ---------------------------------------------------------
+    # STEP 5: Health Check
+    # ---------------------------------------------------------
     async def test_embeddings(self) -> bool:
-        """Test embedding generation"""
+        """Quick test to validate that embedding generation works"""
         try:
             test_text = "This is a test document for embedding generation."
             embedding = await self.generate_embedding(test_text)
@@ -169,4 +216,3 @@ class VectorService:
         except Exception as e:
             self.logger.error(f"Embedding test failed: {e}")
             return False
-

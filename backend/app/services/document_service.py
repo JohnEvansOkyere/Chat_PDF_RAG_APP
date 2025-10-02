@@ -1,6 +1,7 @@
 # backend/app/services/document_service.py
 """
-Document processing service with PDF text extraction and chunking
+Document processing service with PDF text extraction, chunking, 
+and embedding creation for retrieval-augmented generation (RAG).
 """
 
 import os
@@ -23,23 +24,38 @@ logger = logging.getLogger(__name__)
 
 class DocumentService:
     def __init__(self):
+        """Initialize DocumentService with Supabase client and VectorService"""
         self.supabase = get_supabase_client()
         self.vector_service = VectorService()
     
     async def create_document(self, user_id: str, file: UploadFile) -> Dict[str, Any]:
-        """Create document record and upload to storage"""
+        """
+        Create a document record and upload file to storage.
+
+        Steps:
+            1. Generate unique ID and storage path.
+            2. Upload file to Supabase storage.
+            3. Save document record with status = 'processing'.
+
+        Args:
+            user_id (str): ID of the uploading user.
+            file (UploadFile): Uploaded file object.
+
+        Returns:
+            Dict[str, Any]: Document record from database.
+        """
         try:
-            # Generate unique filename
+            # Generate unique document ID and storage path
             document_id = str(uuid.uuid4())
             file_extension = os.path.splitext(file.filename)[1]
             storage_filename = f"{document_id}{file_extension}"
             storage_path = f"{user_id}/{storage_filename}"
             
-            # Read file content
+            # Read file content in memory
             file_content = await file.read()
             file_size = len(file_content)
             
-            # Upload to Supabase storage
+            # Upload to Supabase storage bucket
             try:
                 storage_response = self.supabase.storage.from_('documents').upload(
                     storage_path,
@@ -53,7 +69,7 @@ class DocumentService:
                 logger.error(f"Storage upload failed: {storage_error}")
                 raise Exception(f"Storage upload failed: {storage_error}")
             
-            # Create document record with 'processing' status
+            # Create DB record with "processing" status (not completed yet)
             document_data = {
                 'id': document_id,
                 'user_id': user_id,
@@ -62,7 +78,7 @@ class DocumentService:
                 'file_path': storage_path,
                 'file_size': file_size,
                 'mime_type': file.content_type or 'application/pdf',
-                'status': 'processing'  # Changed from 'completed' to 'processing'
+                'status': 'processing'
             }
             
             response = self.supabase.table('documents').insert(document_data).execute()
@@ -77,29 +93,42 @@ class DocumentService:
             raise
     
     async def process_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
-        """Process uploaded document - extract text, chunk, and create embeddings"""
+        """
+        Process uploaded document:
+            1. Download from storage.
+            2. Extract text from PDF.
+            3. Split into chunks.
+            4. Generate embeddings for chunks.
+            5. Update document status.
+
+        Args:
+            document_id (str): ID of document to process.
+            user_id (str): ID of the user.
+
+        Returns:
+            Dict[str, Any]: Updated document record.
+        """
         try:
             logger.info(f"Processing document {document_id} for user {user_id}")
             
-            # Get document record
+            # Get document metadata from DB
             doc_response = self.supabase.table('documents').select('*').eq('id', document_id).single().execute()
             if not doc_response.data:
                 raise Exception("Document not found")
             
             document = doc_response.data
             
-            # Download file from storage
+            # Step 1: Download file from storage
             try:
                 file_response = self.supabase.storage.from_('documents').download(document['file_path'])
                 if not file_response:
                     raise Exception("Failed to download file from storage")
-                
                 pdf_content = file_response
             except Exception as e:
                 logger.error(f"Failed to download file: {e}")
                 raise Exception(f"Failed to download file: {e}")
             
-            # Extract text from PDF
+            # Step 2: Extract raw text from PDF
             try:
                 extracted_text = await self.extract_text_from_pdf(pdf_content)
                 if not extracted_text.strip():
@@ -110,7 +139,7 @@ class DocumentService:
                 logger.error(f"Text extraction failed: {e}")
                 raise Exception(f"Text extraction failed: {e}")
             
-            # Create chunks
+            # Step 3: Split text into overlapping chunks
             try:
                 chunks = await self.create_text_chunks(extracted_text, document_id)
                 logger.info(f"Created {len(chunks)} chunks from document")
@@ -118,7 +147,7 @@ class DocumentService:
                 logger.error(f"Chunking failed: {e}")
                 raise Exception(f"Chunking failed: {e}")
             
-            # Create embeddings and store chunks
+            # Step 4: Generate embeddings and save
             try:
                 await self.vector_service.create_document_embeddings(document_id, chunks)
                 logger.info(f"Created embeddings for {len(chunks)} chunks")
@@ -126,7 +155,7 @@ class DocumentService:
                 logger.error(f"Embedding creation failed: {e}")
                 raise Exception(f"Embedding creation failed: {e}")
             
-            # Update document status to completed
+            # Step 5: Update document status → completed
             update_data = {
                 'status': 'completed',
                 'processed_at': datetime.utcnow().isoformat(),
@@ -145,7 +174,7 @@ class DocumentService:
         except Exception as e:
             logger.error(f"Error processing document {document_id}: {e}")
             
-            # Update document status to failed
+            # If processing fails, update DB status → failed
             error_update = {
                 'status': 'failed',
                 'error_message': str(e),
@@ -156,7 +185,15 @@ class DocumentService:
             raise
     
     async def extract_text_from_pdf(self, pdf_content: bytes) -> str:
-        """Extract text from PDF bytes"""
+        """
+        Extract plain text from a PDF file.
+
+        Args:
+            pdf_content (bytes): PDF file bytes.
+
+        Returns:
+            str: Extracted text with page markers.
+        """
         try:
             pdf_file = io.BytesIO(pdf_content)
             pdf_reader = PyPDF2.PdfReader(pdf_file)
@@ -178,11 +215,22 @@ class DocumentService:
             raise Exception(f"PDF text extraction failed: {e}")
     
     async def create_text_chunks(self, text: str, document_id: str, chunk_size: int = 1000, overlap: int = 200) -> List[Dict[str, Any]]:
-        """Create overlapping text chunks"""
+        """
+        Split text into overlapping chunks for embedding.
+
+        Args:
+            text (str): Raw document text.
+            document_id (str): Document ID (for metadata).
+            chunk_size (int): Maximum characters per chunk.
+            overlap (int): Overlap size between chunks.
+
+        Returns:
+            List[Dict[str, Any]]: List of chunk dictionaries.
+        """
         try:
             chunks = []
             
-            # Split text into sentences first for better chunking
+            # Break text by sentences for natural splits
             sentences = text.split('. ')
             
             current_chunk = ""
@@ -194,7 +242,7 @@ class DocumentService:
                 sentence_with_period = sentence + ('. ' if i < len(sentences) - 1 else '')
                 sentence_length = len(sentence_with_period)
                 
-                # If adding this sentence would exceed chunk_size, create a chunk
+                # If adding sentence exceeds chunk_size → save current chunk
                 if current_size + sentence_length > chunk_size and current_chunk:
                     chunk_data = {
                         'content': current_chunk.strip(),
@@ -209,7 +257,7 @@ class DocumentService:
                     }
                     chunks.append(chunk_data)
                     
-                    # Create overlap for next chunk
+                    # Build new chunk with overlap
                     overlap_text = current_chunk[-overlap:] if len(current_chunk) > overlap else current_chunk
                     current_chunk = overlap_text + sentence_with_period
                     current_size = len(current_chunk)
@@ -219,7 +267,7 @@ class DocumentService:
                     current_chunk += sentence_with_period
                     current_size += sentence_length
             
-            # Add final chunk if it has content
+            # Add final chunk
             if current_chunk.strip():
                 chunk_data = {
                     'content': current_chunk.strip(),
@@ -241,7 +289,16 @@ class DocumentService:
             raise Exception(f"Text chunking failed: {e}")
     
     async def get_document(self, document_id: str, user_id: str) -> Dict[str, Any]:
-        """Get document by ID"""
+        """
+        Get single document metadata by ID.
+
+        Args:
+            document_id (str): Document ID.
+            user_id (str): User ID (ownership check).
+
+        Returns:
+            Dict[str, Any]: Document record.
+        """
         response = self.supabase.table('documents').select('*').eq('id', document_id).eq('user_id', user_id).single().execute()
         
         if not response.data:
@@ -250,30 +307,48 @@ class DocumentService:
         return response.data
     
     async def get_user_documents(self, user_id: str) -> List[Dict[str, Any]]:
-        """Get all documents for a user"""
+        """
+        Get all documents belonging to a user.
+
+        Args:
+            user_id (str): User identifier.
+
+        Returns:
+            List[Dict[str, Any]]: List of documents.
+        """
         response = self.supabase.table('documents').select('*').eq('user_id', user_id).neq('status', 'deleted').order('created_at', desc=True).execute()
-        
         return response.data or []
     
     async def delete_document(self, document_id: str, user_id: str):
-        """Delete document and associated data"""
+        """
+        Delete document and associated data.
+
+        Steps:
+            1. Delete file from storage.
+            2. Delete related chunks from DB.
+            3. Mark document as 'deleted' in DB.
+
+        Args:
+            document_id (str): ID of the document.
+            user_id (str): ID of the owner.
+        """
         try:
-            # Get document first
+            # Step 1: Fetch document metadata
             document = await self.get_document(document_id, user_id)
             
-            # Try to delete from storage
+            # Step 2: Delete file from storage bucket
             try:
                 self.supabase.storage.from_('documents').remove([document['file_path']])
             except Exception as e:
                 logger.warning(f"Failed to delete file from storage: {e}")
             
-            # Delete chunks if they exist
+            # Step 3: Delete all document chunks
             try:
                 self.supabase.table('document_chunks').delete().eq('document_id', document_id).execute()
             except Exception as e:
                 logger.warning(f"Failed to delete chunks: {e}")
             
-            # Mark document as deleted
+            # Step 4: Mark document record as deleted
             self.supabase.table('documents').update({'status': 'deleted'}).eq('id', document_id).execute()
             
         except Exception as e:
