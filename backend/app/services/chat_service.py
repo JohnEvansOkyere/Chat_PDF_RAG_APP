@@ -26,6 +26,19 @@ class ChatService:
         self.vector_service = VectorService()
         self.llm_service = LLMService()
         self.logger = logger
+
+    def _serialize_session(self, session: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize session payloads for API responses."""
+        return {
+            'id': session['id'],
+            'title': session.get('title', 'New Chat'),
+            'document_id': session.get('document_id'),
+            'message_count': session.get('message_count', 0),
+            'created_at': session['created_at'],
+            'updated_at': session['updated_at'],
+            **({'status': session['status']} if 'status' in session else {}),
+            **({'user_id': session['user_id']} if 'user_id' in session else {}),
+        }
     
     async def create_session(self, user_id: str, title: str = "New Chat", document_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -45,17 +58,31 @@ class ChatService:
                 'id': str(uuid.uuid4()),
                 'user_id': user_id,
                 'title': title,
-                'document_id': document_id,
                 'status': 'active',
                 'created_at': datetime.utcnow().isoformat(),
                 'updated_at': datetime.utcnow().isoformat()
             }
-            
-            # Insert into Supabase
-            response = self.supabase.table('chat_sessions').insert(session_data).execute()
+
+            if document_id:
+                session_data['document_id'] = document_id
+
+            # Insert into Supabase. If the DB schema does not yet include
+            # `document_id`, retry without it so chat can still function.
+            try:
+                response = self.supabase.table('chat_sessions').insert(session_data).execute()
+            except Exception as e:
+                if document_id and "document_id" in str(e):
+                    self.logger.warning("chat_sessions.document_id is missing in Supabase; retrying without it")
+                    fallback_data = {k: v for k, v in session_data.items() if k != 'document_id'}
+                    response = self.supabase.table('chat_sessions').insert(fallback_data).execute()
+                else:
+                    raise
             
             if response.data:
-                return response.data[0]
+                session = self._serialize_session(response.data[0])
+                if document_id and 'document_id' not in response.data[0]:
+                    session['document_id'] = document_id
+                return session
             else:
                 raise Exception("Failed to create session")
                 
@@ -75,7 +102,7 @@ class ChatService:
         """
         try:
             response = self.supabase.table('chat_sessions').select('*').eq('user_id', user_id).order('updated_at', desc=True).execute()
-            return response.data or []
+            return [self._serialize_session(session) for session in (response.data or [])]
         except Exception as e:
             self.logger.error(f"Failed to get user sessions: {e}")
             return []
@@ -101,7 +128,7 @@ class ChatService:
             # Fetch all messages in this session
             messages_response = self.supabase.table('chat_messages').select('*').eq('session_id', session_id).order('created_at').execute()
             
-            session = session_response.data
+            session = self._serialize_session(session_response.data)
             session['messages'] = messages_response.data or []
             return session
             

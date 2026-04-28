@@ -84,6 +84,11 @@ export default function ChatPage() {
       const sessionData = await chatAPI.getSession(session.id);
       setCurrentSession(session);
       setMessages(sessionData.messages || []);
+
+      if (sessionData.document_id) {
+        const linkedDocument = documents.find((doc) => doc.id === sessionData.document_id) || null;
+        setCurrentDocument(linkedDocument);
+      }
     } catch (error) {
       toast.error('Failed to load session');
     }
@@ -199,8 +204,13 @@ export default function ChatPage() {
                 <div
                   key={doc.id}
                   className={`flex items-center p-2 rounded-md cursor-pointer hover:bg-gray-100 ${
-                    doc.status === 'completed' ? 'text-gray-900' : 'text-gray-500'
+                    currentDocument?.id === doc.id
+                      ? 'bg-blue-50 border border-blue-200 text-gray-900'
+                      : doc.status === 'completed'
+                        ? 'text-gray-900'
+                        : 'text-gray-500'
                   }`}
+                  onClick={() => setCurrentDocument(doc)}
                 >
                   <FileText size={16} className="text-gray-400 mr-2 flex-shrink-0" />
                   <div className="flex-1 min-w-0">

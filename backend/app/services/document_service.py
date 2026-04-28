@@ -27,6 +27,7 @@ class DocumentService:
         """Initialize DocumentService with Supabase client and VectorService"""
         self.supabase = get_supabase_client()
         self.vector_service = VectorService()
+        self.storage_bucket = settings.storage_bucket
     
     async def create_document(self, user_id: str, file: UploadFile) -> Dict[str, Any]:
         """
@@ -57,7 +58,7 @@ class DocumentService:
             
             # Upload to Supabase storage bucket
             try:
-                storage_response = self.supabase.storage.from_('documents').upload(
+                storage_response = self.supabase.storage.from_(self.storage_bucket).upload(
                     storage_path,
                     file_content,
                     file_options={
@@ -120,7 +121,7 @@ class DocumentService:
             
             # Step 1: Download file from storage
             try:
-                file_response = self.supabase.storage.from_('documents').download(document['file_path'])
+                file_response = self.supabase.storage.from_(self.storage_bucket).download(document['file_path'])
                 if not file_response:
                     raise Exception("Failed to download file from storage")
                 pdf_content = file_response
@@ -338,7 +339,7 @@ class DocumentService:
             
             # Step 2: Delete file from storage bucket
             try:
-                self.supabase.storage.from_('documents').remove([document['file_path']])
+                self.supabase.storage.from_(self.storage_bucket).remove([document['file_path']])
             except Exception as e:
                 logger.warning(f"Failed to delete file from storage: {e}")
             

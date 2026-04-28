@@ -36,9 +36,7 @@ class VectorService:
     # STEP 1: Initialize Embedding Client
     # ---------------------------------------------------------
     def _initialize_embedding_client(self):
-        """Setup HTTP client and config for selected embedding provider"""
-        self.client = httpx.AsyncClient(timeout=60.0)
-        
+        """Setup provider-specific config for the selected embedding provider."""
         if self.config.embedding_provider == "openai":
             # OpenAI embeddings
             self.embedding_url = "https://api.openai.com/v1/embeddings"
@@ -56,11 +54,20 @@ class VectorService:
                 "Content-Type": "application/json"
             }
             self.embedding_model = self.config.cohere_embedding_model
+
+    async def _post_embedding_request(self, payload: Dict[str, Any]) -> httpx.Response:
+        """Use a fresh HTTP client per embedding request for background-task safety."""
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            return await client.post(
+                self.embedding_url,
+                headers=self.headers,
+                json=payload
+            )
     
     # ---------------------------------------------------------
     # STEP 2: Embedding Generation
     # ---------------------------------------------------------
-    async def generate_embedding(self, text: str) -> List[float]:
+    async def generate_embedding(self, text: str, input_type: Optional[str] = None) -> List[float]:
         """
         Generate embedding for given text.
         Works with both OpenAI and Cohere providers.
@@ -72,11 +79,7 @@ class VectorService:
                     "input": text
                 }
                 
-                response = await self.client.post(
-                    self.embedding_url,
-                    headers=self.headers,
-                    json=payload
-                )
+                response = await self._post_embedding_request(payload)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -87,23 +90,40 @@ class VectorService:
             elif self.config.embedding_provider == "cohere":
                 payload = {
                     "texts": [text],
-                    "model": self.embedding_model
+                    "model": self.embedding_model,
+                    "embedding_types": ["float"],
                 }
+
+                # Cohere v3+ embedding models require input_type for search use-cases.
+                if input_type:
+                    payload["input_type"] = input_type
                 
-                response = await self.client.post(
-                    self.embedding_url,
-                    headers=self.headers,
-                    json=payload
-                )
+                response = await self._post_embedding_request(payload)
                 
                 if response.status_code == 200:
                     data = response.json()
-                    return data['embeddings'][0]
+                    embeddings = data.get('embeddings')
+
+                    # Cohere can return embeddings either as a plain list or as a
+                    # typed object when embedding_types is specified.
+                    if isinstance(embeddings, list):
+                        return embeddings[0]
+
+                    if isinstance(embeddings, dict):
+                        if 'float' in embeddings:
+                            return embeddings['float'][0]
+                        if 'floats' in embeddings:
+                            return embeddings['floats'][0]
+
+                    if 'embeddings_floats' in data:
+                        return data['embeddings_floats'][0]
+
+                    raise Exception(f"Unexpected Cohere embedding response shape: {data}")
                 else:
-                    raise Exception(f"Cohere Embedding API error: {response.status_code}")
+                    raise Exception(f"Cohere Embedding API error: {response.status_code} - {response.text}")
                     
         except Exception as e:
-            self.logger.error(f"Error generating embedding: {e}")
+            self.logger.error(f"Error generating embedding: {type(e).__name__}: {e!r}")
             raise
     
     # ---------------------------------------------------------
@@ -118,7 +138,10 @@ class VectorService:
             chunk_records = []
             
             for i, chunk in enumerate(chunks):
-                embedding = await self.generate_embedding(chunk['content'])
+                embedding = await self.generate_embedding(
+                    chunk['content'],
+                    input_type="search_document"
+                )
                 
                 chunk_record = {
                     'document_id': document_id,
@@ -165,7 +188,10 @@ class VectorService:
             3. Call Supabase RPC for similarity search
         """
         try:
-            query_embedding = await self.generate_embedding(query)
+            query_embedding = await self.generate_embedding(
+                query,
+                input_type="search_query"
+            )
             
             # If no specific document → get all user's completed documents
             document_ids = None
@@ -190,8 +216,21 @@ class VectorService:
                 'similarity_threshold': similarity_threshold,
                 'match_count': limit
             }).execute()
-            
-            return search_response.data or []
+
+            results = search_response.data or []
+
+            # If nothing matches at the default threshold, retry once with a
+            # zero threshold so the chat can still ground on the nearest chunks.
+            if not results and similarity_threshold > 0:
+                retry_response = self.supabase.rpc('search_document_chunks', {
+                    'query_embedding': query_embedding,
+                    'document_ids': document_ids,
+                    'similarity_threshold': 0.0,
+                    'match_count': limit
+                }).execute()
+                results = retry_response.data or []
+
+            return results
             
         except Exception as e:
             self.logger.error(f"Error searching similar chunks: {e}")
@@ -204,7 +243,10 @@ class VectorService:
         """Quick test to validate that embedding generation works"""
         try:
             test_text = "This is a test document for embedding generation."
-            embedding = await self.generate_embedding(test_text)
+            embedding = await self.generate_embedding(
+                test_text,
+                input_type="search_document"
+            )
             
             if embedding and len(embedding) > 0:
                 self.logger.info("Embedding test successful")

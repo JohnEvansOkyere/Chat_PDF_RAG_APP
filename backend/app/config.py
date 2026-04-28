@@ -89,6 +89,7 @@ class Settings(BaseSettings):
     # -------------------------------
     # Document Processing
     # -------------------------------
+    storage_bucket: str = "documents"
     max_file_size_mb: int = 50       # Max upload size (MB)
     chunk_size: int = 1000           # Characters per chunk
     chunk_overlap: int = 200         # Overlap between chunks
