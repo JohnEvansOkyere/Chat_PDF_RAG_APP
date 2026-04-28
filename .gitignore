@@ -1,4 +1,18 @@
 .env
+.env.local
+.codex
+
+# Project runtime artifacts
+/backups/
+/cache/
+/data/cache/
+/exports/
+/logs/
+/temp/
+/frontend/.next/
+/frontend/node_modules/
+/frontend/.env.local
+/frontend/.vercel/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

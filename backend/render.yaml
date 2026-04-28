@@ -4,10 +4,10 @@ services:
     env: python
     plan: free
     region: oregon
-    rootDir: Chat_PDF_RAG_APP/backend
+    rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 65 --workers 1
-    healthCheckPath: /api/health  # Keep this as /api/health since that's your main health endpoint
+    healthCheckPath: /api/health
     autoDeploy: true
     envVars:
       - key: ENVIRONMENT
@@ -40,5 +40,3 @@ services:
         value: text-embedding-3-small
       - key: CORS_ORIGINS
         value: "https://chat-pdf-rag-app.vercel.app, http://localhost:3000"
-
-        

@@ -2,13 +2,7 @@
 import axios from 'axios';
 import { AuthResponse, Document, ChatSession, ChatMessage, ChatRequest, ChatResponse } from '@/types';
 
-// Force the production URL directly - no environment variable dependency
-const API_BASE_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-  ? 'https://chat-pdf-rag-app.onrender.com/api'  // Production
-  : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'; // Development
-
-console.log("🚀 API BASE URL (FORCED):", API_BASE_URL);
-console.log("🌍 Current hostname:", typeof window !== 'undefined' ? window.location.hostname : 'server-side');
+const API_BASE_URL = '/api';
 
 // Create axios instance
 const api = axios.create({
@@ -18,10 +12,8 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to add auth token and debug
+// Request interceptor to add auth token
 api.interceptors.request.use((config) => {
-  console.log('🌐 Making request to:', (config.baseURL || '') + (config.url || ''));
-  
   const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   
   if (token) {
@@ -34,14 +26,6 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('❌ API Error:', {
-      url: error.config?.url,
-      baseURL: error.config?.baseURL,
-      fullURL: (error.config?.baseURL || '') + (error.config?.url || ''),
-      status: error.response?.status,
-      message: error.message
-    });
-    
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
       localStorage.removeItem('user');
@@ -54,7 +38,6 @@ api.interceptors.response.use(
 // Auth API
 export const authAPI = {
   register: async (email: string, password: string, displayName?: string) => {
-    console.log('📝 Attempting registration...');
     const response = await api.post('/auth/register', {
       email,
       password,
@@ -64,7 +47,6 @@ export const authAPI = {
   },
 
   login: async (email: string, password: string): Promise<AuthResponse> => {
-    console.log('🔐 Attempting login...');
     const response = await api.post('/auth/login', {
       email,
       password,

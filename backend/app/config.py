@@ -17,6 +17,7 @@ and can be customized via `.env` file.
 """
 
 from typing import List, Optional
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -36,6 +37,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     debug: bool = True
     log_level: str = "INFO"
+    cors_origins: List[str] = Field(default_factory=lambda: ["http://localhost:3000"])
     
     # -------------------------------
     # Server Configuration
@@ -53,7 +55,7 @@ class Settings(BaseSettings):
     # -------------------------------
     # Database (Supabase)
     # -------------------------------
-    database_url: str
+    database_url: str = ""
     supabase_url: str
     supabase_service_role_key: str
     
@@ -109,10 +111,36 @@ class Settings(BaseSettings):
         """Convert max file size from MB → bytes for validation purposes."""
         return self.max_file_size_mb * 1024 * 1024
     
-    @property
-    def cors_origins(self) -> List[str]:
-        """CORS origins - currently wildcard to allow all origins (not restrictive)."""
-        return ["*"]
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value):
+        """Allow CORS origins to be provided as a comma-separated env var."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("supabase_url", mode="before")
+    @classmethod
+    def normalize_supabase_url(cls, value):
+        """
+        Normalize Supabase URL to the project root.
+
+        The Supabase Python client expects:
+        https://<project-id>.supabase.co
+
+        Users sometimes paste the REST endpoint instead:
+        https://<project-id>.supabase.co/rest/v1
+        """
+        if not isinstance(value, str):
+            return value
+
+        normalized = value.strip().rstrip("/")
+
+        for suffix in ("/rest/v1", "/auth/v1", "/storage/v1"):
+            if normalized.endswith(suffix):
+                normalized = normalized[: -len(suffix)]
+
+        return normalized
     
     @property
     def current_llm_config(self) -> dict:

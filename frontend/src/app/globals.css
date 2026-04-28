@@ -1,3 +1,98 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --surface: #f5efe2;
+  --surface-strong: #eadfc8;
+  --card: rgba(255, 252, 245, 0.84);
+  --card-strong: #fffaf0;
+  --ink: #1f2937;
+  --muted: #5f6b76;
+  --accent: #c35b33;
+  --accent-deep: #8f3518;
+  --forest: #24463d;
+  --line: rgba(36, 70, 61, 0.14);
+  --shadow-soft: 0 18px 45px rgba(53, 42, 30, 0.12);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body), sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(195, 91, 51, 0.16), transparent 28%),
+    radial-gradient(circle at 80% 20%, rgba(36, 70, 61, 0.14), transparent 24%),
+    linear-gradient(180deg, #f8f3e9 0%, #f5efe2 100%);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), serif;
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: rgba(195, 91, 51, 0.22);
+}
+
+@layer components {
+  .glass-card {
+    @apply border rounded-[28px];
+    background: var(--card);
+    border-color: var(--line);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(16px);
+  }
+
+  .hero-chip {
+    @apply inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs uppercase tracking-[0.24em];
+    background: rgba(255, 250, 240, 0.78);
+    border-color: rgba(143, 53, 24, 0.14);
+    color: var(--accent-deep);
+  }
+
+  .primary-button {
+    @apply inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition-all duration-200;
+    background: var(--accent);
+    color: #fffaf4;
+    box-shadow: 0 14px 28px rgba(143, 53, 24, 0.22);
+  }
+
+  .primary-button:hover {
+    background: var(--accent-deep);
+    transform: translateY(-1px);
+  }
+
+  .secondary-button {
+    @apply inline-flex items-center justify-center rounded-full border px-6 py-3 text-sm font-semibold transition-colors duration-200;
+    border-color: rgba(36, 70, 61, 0.18);
+    color: var(--forest);
+    background: rgba(255, 250, 240, 0.7);
+  }
+
+  .secondary-button:hover {
+    background: rgba(255, 250, 240, 0.92);
+  }
+
+  .auth-input {
+    @apply w-full rounded-2xl border px-4 py-3 text-sm text-slate-900 outline-none transition-all duration-200;
+    border-color: rgba(36, 70, 61, 0.14);
+    background: rgba(255, 252, 245, 0.88);
+  }
+
+  .auth-input::placeholder {
+    color: #8b8f93;
+  }
+
+  .auth-input:focus {
+    border-color: rgba(195, 91, 51, 0.4);
+    box-shadow: 0 0 0 4px rgba(195, 91, 51, 0.08);
+  }
+}

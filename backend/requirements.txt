@@ -1,81 +1,16 @@
-# VexaAI RAG Chat PDF Application Dependencies
-# Developed by: John Evans Okyere
-
-# Core Streamlit Framework
-streamlit
-
-# LangChain and Components
-langchain
-langchain-community
-langchain-core
-langchain-ollama
-langchain-text-splitters
-tiktoken
-
-# PDF Processing
-pdfplumber
-pypdf
-pymupdf
-PyMuPDF
-
-# Vector Store and Embeddings
-faiss-cpu
-chromadb
-numpy
-
-# HTTP and API
-requests
-httpx
-aiofiles
-
-# Environment and Configuration
-python-dotenv
-pydantic
-pydantic-settings
-pydantic[email]
-
-# Data Processing
-pandas
-python-json-logger
-structlog
-
-# System and Performance Monitoring
-psutil
-
-# Additional Utilities
-typing-extensions
-tenacity
-
-# Authentication and Security
-PyJWT
-bcrypt
-cryptography
-python-jose[cryptography]
-
-# Database
-supabase
-psycopg2-binary
-asyncpg
-
-# LLM Integrations
-openai
-anthropic
-cohere
-
-# FastAPI and Server
 fastapi
 uvicorn[standard]
 python-multipart
+httpx
 
-# Development and Testing (Optional)
-pytest
-pytest-asyncio
-black
-flake8
-mypy
-isort
+pydantic
+pydantic-settings
+python-dotenv
 
-
+supabase
 PyJWT
 bcrypt
+
+PyMuPDF
 PyPDF2
+langchain-text-splitters

@@ -133,16 +133,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Setup middleware
-# Setup middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=False,  # MUST be False when using wildcard origins
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-print(f"CORS CONFIG: origins={settings.cors_origins}, credentials=False")  # Add this line
 app.add_middleware(RateLimitMiddleware)
 app.add_middleware(LoggingMiddleware)
 
